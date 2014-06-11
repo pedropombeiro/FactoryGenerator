@@ -9,7 +9,6 @@
 
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
-    using Microsoft.CodeAnalysis.MSBuild;
     using Microsoft.CodeAnalysis.Simplification;
     using Microsoft.CodeAnalysis.Text;
 
@@ -30,7 +29,7 @@
         #region Constructors and Destructors
 
         [DebuggerStepThrough]
-        public FactoryTemplate(MSBuildWorkspace workspace,
+        public FactoryTemplate(Workspace workspace,
                                Solution solution)
         {
             this.workspace = workspace;
