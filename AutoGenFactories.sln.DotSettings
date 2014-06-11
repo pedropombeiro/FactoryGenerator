@@ -1,0 +1,11 @@
+﻿<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+	<s:Boolean x:Key="/Default/Environment/InjectedLayers/FileInjectedLayer/=87B858B0B7F4B54280C67A9E805717B4/@KeyIndexDefined">True</s:Boolean>
+	<s:String x:Key="/Default/Environment/InjectedLayers/FileInjectedLayer/=87B858B0B7F4B54280C67A9E805717B4/AbsolutePath/@EntryValue">C:\Users\Pedro\Documents\GitHub\AutoGenFactories\CodeStyle.DotSettings</s:String>
+	<s:String x:Key="/Default/Environment/InjectedLayers/FileInjectedLayer/=87B858B0B7F4B54280C67A9E805717B4/RelativePath/@EntryValue">..\CodeStyle.DotSettings</s:String>
+	<s:Boolean x:Key="/Default/Environment/InjectedLayers/FileInjectedLayer/=B9705660FC59134DABA544A0F0FE472D/@KeyIndexDefined">True</s:Boolean>
+	<s:String x:Key="/Default/Environment/InjectedLayers/FileInjectedLayer/=B9705660FC59134DABA544A0F0FE472D/AbsolutePath/@EntryValue">C:\Users\Pedro\Documents\GitHub\AutoGenFactories\GeneralCode.DotSettings</s:String>
+	<s:String x:Key="/Default/Environment/InjectedLayers/FileInjectedLayer/=B9705660FC59134DABA544A0F0FE472D/RelativePath/@EntryValue">..\GeneralCode.DotSettings</s:String>
+	<s:Boolean x:Key="/Default/Environment/InjectedLayers/InjectedLayerCustomization/=File87B858B0B7F4B54280C67A9E805717B4/@KeyIndexDefined">True</s:Boolean>
+	<s:Double x:Key="/Default/Environment/InjectedLayers/InjectedLayerCustomization/=File87B858B0B7F4B54280C67A9E805717B4/RelativePriority/@EntryValue">4</s:Double>
+	<s:Boolean x:Key="/Default/Environment/InjectedLayers/InjectedLayerCustomization/=FileB9705660FC59134DABA544A0F0FE472D/@KeyIndexDefined">True</s:Boolean>
+	<s:Double x:Key="/Default/Environment/InjectedLayers/InjectedLayerCustomization/=FileB9705660FC59134DABA544A0F0FE472D/RelativePriority/@EntryValue">3</s:Double></wpf:ResourceDictionary>
