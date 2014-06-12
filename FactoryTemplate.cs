@@ -20,6 +20,8 @@
 
         private readonly List<InterfaceDeclarationSyntax> allInterfaces = new List<InterfaceDeclarationSyntax>(128);
 
+        private readonly Dictionary<InterfaceDeclarationSyntax, TypeDeclarationSyntaxSource> allInterfacesDictionary = new Dictionary<InterfaceDeclarationSyntax, TypeDeclarationSyntaxSource>(128);
+
         private readonly Workspace workspace;
 
         private Solution solution;
@@ -79,6 +81,10 @@
                     //GenerateFactoriesForAttributedClasses(classDeclarations, interfaceDeclarations, semanticModel);
 
                     this.allInterfaces.AddRange(interfaceDeclarations);
+                    foreach (var interfaceDeclarationSyntax in interfaceDeclarations)
+                    {
+                        this.allInterfacesDictionary.Add(interfaceDeclarationSyntax, typeDeclarationSyntaxSource);
+                    }
                 }
             }
 
@@ -102,6 +108,75 @@
         #endregion
 
         #region Methods
+
+        private static string BuildFactoryImplementationFieldsCodeSection(IEnumerable<IParameterSymbol> allConstructorParameters,
+                                                                          IParameterSymbol[] allContractMethodParameters)
+        {
+            var fieldsStringBuilder = new StringBuilder();
+            var injectedParameters = (from parameter in allConstructorParameters
+                                      where !allContractMethodParameters.Any(contractMethodParameter => CompareParameters(contractMethodParameter, parameter))
+                                      select parameter).ToArray();
+            if (injectedParameters.Any())
+            {
+                fieldsStringBuilder.AppendLine("        #region Fields");
+                fieldsStringBuilder.AppendLine();
+
+                foreach (var injectedParameter in injectedParameters)
+                {
+                    fieldsStringBuilder.AppendFormat("        private readonly {0} {1};",
+                                                     injectedParameter.Type,
+                                                     injectedParameter.Name);
+                    fieldsStringBuilder.AppendLine();
+                    fieldsStringBuilder.AppendLine();
+                }
+
+                fieldsStringBuilder.AppendLine("        #endregion");
+                fieldsStringBuilder.AppendLine();
+            }
+            return fieldsStringBuilder.ToString();
+        }
+
+        private static string BuildFactoryImplementationMethodsCodeSection(ClassDeclarationSyntax concreteClassDeclarationSyntax,
+                                                                           InterfaceDeclarationSyntax contractInterfaceDeclarationSyntax,
+                                                                           IEnumerable<IParameterSymbol> allConstructorParameters,
+                                                                           IEnumerable<IParameterSymbol> allContractMethodParameters)
+        {
+            var injectedParameters = (from parameter in allConstructorParameters
+                                      where !allContractMethodParameters.Any(contractMethodParameter => CompareParameters(contractMethodParameter, parameter))
+                                      select parameter).ToArray();
+
+            var factoryMethodsStringBuilder = new StringBuilder();
+            var constructors = concreteClassDeclarationSyntax.Members.OfType<ConstructorDeclarationSyntax>().ToArray();
+            if (constructors.Any())
+            {
+                factoryMethodsStringBuilder.AppendLine("        #region Public Factory Methods");
+                factoryMethodsStringBuilder.AppendLine();
+
+                foreach (var constructor in constructors)
+                {
+                    var parameterListSyntax = constructor.ParameterList;
+                    foreach (var injectedParameter in injectedParameters.Where(injectedParameter => parameterListSyntax.Parameters.Any(ps => ps.Identifier.Text == injectedParameter.Name)))
+                    {
+                        parameterListSyntax = parameterListSyntax.Parameters.Remove();
+                    }
+
+                    factoryMethodsStringBuilder.AppendFormat("        public {0} Create{1};", GetDeclarationFullName(contractInterfaceDeclarationSyntax), parameterListSyntax);
+                    factoryMethodsStringBuilder.AppendLine();
+                    factoryMethodsStringBuilder.AppendLine();
+                }
+
+                factoryMethodsStringBuilder.AppendLine("        #endregion");
+                factoryMethodsStringBuilder.AppendLine();
+            }
+
+            return factoryMethodsStringBuilder.ToString();
+        }
+
+        private static bool CompareParameters(IParameterSymbol parameter1,
+                                              IParameterSymbol parameter2)
+        {
+            return (parameter1.Name == parameter2.Name);
+        }
 
         private static string GetDeclarationFullName(BaseTypeDeclarationSyntax typeDeclarationSyntax)
         {
@@ -223,13 +298,13 @@
 
             Console.WriteLine("Rendering factory implementation {0}\r\n\tfor interface {1}\r\n\ttargeting {2}...", factoryClassGenericName, contractInterfaceFullName, GetDeclarationFullName(concreteClassDeclarationSyntax));
 
-            this.RenderFactoryImplementation(concreteClassDeclarationSyntax, contractInterfaceDeclaration, GetSafeFileName(factoryClassGenericName));
-
-            Console.WriteLine("Looking for factory interface for type {0}...", contractInterfaceDeclarationSyntax.Identifier);
+            Console.WriteLine("    Looking for factory interface for type {0}...", contractInterfaceDeclarationSyntax.Identifier);
 
             var factoryInterfaceFullName = this.GetFactoryInterfaceFullName(contractInterfaceDeclarationSyntax, concreteClassDeclarationSyntax);
 
-            Console.WriteLine("Factory interface is {0}", factoryInterfaceFullName);
+            Console.WriteLine("    Factory interface is {0}", factoryInterfaceFullName);
+
+            this.RenderFactoryImplementation(concreteClassDeclarationSyntax, contractInterfaceDeclaration, factoryInterfaceFullName, GetSafeFileName(factoryClassGenericName));
 
             if (!this.UserGeneratedInterfaceExists(factoryInterfaceFullName) &&
                 !this.UserGeneratedInterfaceExists(string.Format("{0}Factory", contractInterfaceDeclarationSyntax.Identifier.ValueText)))
@@ -326,27 +401,42 @@
 
         private void RenderFactoryImplementation(ClassDeclarationSyntax concreteClassDeclarationSyntax,
                                                  InterfaceDeclarationSyntax contractInterfaceDeclarationSyntax,
+                                                 string factoryInterfaceFullName,
                                                  string factoryName)
         {
             var fileName = string.Format("{0}.Generated.cs", factoryName);
+            var factoryInterfaceDeclarationSyntax = this.allInterfaces.Single(interfaceDeclarationSyntax => GetDeclarationFullName(interfaceDeclarationSyntax) == factoryInterfaceFullName);
 
+            var factoryInterfaceCompilation = this.allInterfacesDictionary[factoryInterfaceDeclarationSyntax].Compilation;
+            var concreteClassCompilation = this.allClasses.Single(kvp => kvp.Key == concreteClassDeclarationSyntax).Value.Compilation; // TODO: Improve data structure
+            var resolvedFactoryInterfaceType = factoryInterfaceCompilation.GetTypeByMetadataName(factoryInterfaceFullName);
+            var resolvedConcreteClassType = concreteClassCompilation.GetTypeByMetadataName(GetDeclarationFullName(concreteClassDeclarationSyntax));
             var usingsToFilterOut = new[] { "T4Factories", GetDeclarationNamespaceFullName(concreteClassDeclarationSyntax) };
             var outerUsingDeclarations = this.FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<CompilationUnitSyntax>().Usings, usingsToFilterOut);
             var innerUsingDeclarations = this.FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<NamespaceDeclarationSyntax>().Usings, usingsToFilterOut);
 
-            var constructorsStringBuilder = new StringBuilder();
-            var constructors = concreteClassDeclarationSyntax.Members.OfType<ConstructorDeclarationSyntax>().ToArray();
-            foreach (var constructor in constructors)
+            var allConstructorParameters = resolvedConcreteClassType.Constructors.SelectMany(constructor => constructor.Parameters).ToArray();
+            var contractTypeMethods = resolvedFactoryInterfaceType != null
+                                          ? resolvedFactoryInterfaceType.GetMembers().OfType<IMethodSymbol>().ToArray()
+                                          : new IMethodSymbol[0];
+            var allContractMethodParameters = contractTypeMethods.SelectMany(contractTypeMethod => contractTypeMethod.Parameters).ToArray();
+            if (resolvedFactoryInterfaceType != null && !contractTypeMethods.Any())
             {
-                /*var allParameters = constructor.Parameters.Cast<EnvDTE80.CodeParameter2>();
-                var parameters = from parameter in allParameters
-                                 where !IsParameterInjected(parameter)
-                                 select parameter;
+                Console.WriteLine("No Methods! Looking for parent interfaces...");
+                foreach (var factoryParentInterfaceContractType in resolvedFactoryInterfaceType.AllInterfaces)
+                {
+                    Console.WriteLine("  inheritedFrom = {0}", factoryParentInterfaceContractType.ToDisplayString());
 
-                WriteLine(string.Empty);
-                Write(this.RenderXmlDoc(constructor.DocComment));#>*/
-                constructorsStringBuilder.AppendFormat("{0} Create{1};", GetDeclarationFullName(contractInterfaceDeclarationSyntax), constructor.ParameterList);
+                    contractTypeMethods = factoryParentInterfaceContractType.GetMembers().OfType<IMethodSymbol>().ToArray();
+                    allContractMethodParameters = contractTypeMethods.SelectMany(contractTypeMethod => contractTypeMethod.Parameters).ToArray();
+                    var parametersString = string.Join(", ", allContractMethodParameters.Select(x => x.Name));
+
+                    Console.WriteLine("  parameters from inheritance : {0}", parametersString);
+                }
             }
+
+            var factoryFieldsCodeSection = BuildFactoryImplementationFieldsCodeSection(allConstructorParameters, allContractMethodParameters);
+            var factoryMethodsCodeSection = BuildFactoryImplementationMethodsCodeSection(concreteClassDeclarationSyntax, contractInterfaceDeclarationSyntax, allConstructorParameters, allContractMethodParameters);
 
             var code = @"#pragma warning disable 1591
 
@@ -359,6 +449,8 @@
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public partial class <#=factoryTypeName#> : <#=factoryContractTypeFullName#>
     {
+<#=factoryFields#>
+<#=factoryMethods#>
     }
 }"
                 .Replace("<#=namespaceFullName#>", GetDeclarationNamespaceFullName(concreteClassDeclarationSyntax))
@@ -372,7 +464,8 @@
                 .Replace("<#=factoryContractTypeFullName#>", this.GetFactoryInterfaceFullName(contractInterfaceDeclarationSyntax, concreteClassDeclarationSyntax))
                 .Replace("<#=GeneratedCodeAttribute#>", "global::System.CodeDom.Compiler.GeneratedCode(\"AutoGenFactories\", \"0.1\")")
                 .Replace("<#=concreteXmlDocSafeTypeName#>", GetXmlDocSafeTypeName(GetDeclarationFullName(concreteClassDeclarationSyntax)))
-                .Replace("<#=factoryMethods#>", constructorsStringBuilder.ToString());
+                .Replace("<#=factoryFields#>", factoryFieldsCodeSection)
+                .Replace("<#=factoryMethods#>", factoryMethodsCodeSection);
 
             var project = this.solution.Projects.First(proj => proj.GetDocument(concreteClassDeclarationSyntax.SyntaxTree) != null);
             var typeDeclarationDocument = project.GetDocument(concreteClassDeclarationSyntax.SyntaxTree);
