@@ -1,4 +1,4 @@
-namespace DeveloperInTheFlow.AutoGenFactories
+﻿namespace DeveloperInTheFlow.AutoGenFactories
 {
     using System;
     using System.Collections.Generic;
