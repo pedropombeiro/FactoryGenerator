@@ -9,18 +9,11 @@
 
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
-    using Microsoft.CodeAnalysis.Simplification;
     using Microsoft.CodeAnalysis.Text;
 
     public class FactoryTemplate
     {
         #region Fields
-
-        private readonly List<KeyValuePair<ClassDeclarationSyntax, TypeDeclarationSyntaxSource>> allClasses = new List<KeyValuePair<ClassDeclarationSyntax, TypeDeclarationSyntaxSource>>(128);
-
-        private readonly List<InterfaceDeclarationSyntax> allInterfaces = new List<InterfaceDeclarationSyntax>(128);
-
-        private readonly Dictionary<InterfaceDeclarationSyntax, TypeDeclarationSyntaxSource> allInterfacesDictionary = new Dictionary<InterfaceDeclarationSyntax, TypeDeclarationSyntaxSource>(128);
 
         private readonly Workspace workspace;
 
@@ -44,58 +37,29 @@
 
         public async Task ExecuteAsync()
         {
-            var projectDependencyGraph = await this.solution.GetProjectDependencyGraphAsync();
+            var chrono = new Stopwatch();
 
+            chrono.Start();
+
+            var projectDependencyGraph = await this.solution.GetProjectDependencyGraphAsync();
+            var tasksList = new List<Task>(16);
             foreach (var projectId in projectDependencyGraph.GetTopologicallySortedProjects())
             {
                 var project = this.solution.GetProject(projectId);
                 var compilation = await project.GetCompilationAsync();
 
-                foreach (var syntaxTree in compilation.SyntaxTrees)
-                {
-                    var syntaxRootNode = syntaxTree.GetRoot();
-                    var classDeclarations =
-                        syntaxRootNode.DescendantNodesAndSelf(syntaxNode => !(syntaxNode is ClassDeclarationSyntax))
-                                      .OfType<ClassDeclarationSyntax>()
-                                      .Where(classDeclarationSyntax => classDeclarationSyntax.AttributeLists.Count > 0 && classDeclarationSyntax.AttributeLists.SelectMany(a => a.Attributes).Any(x => x.Name.ToString() == "GenerateT4Factory"))
-                                      .ToArray();
-                    var interfaceDeclarations =
-                        syntaxRootNode.DescendantNodesAndSelf(syntaxNode => !(syntaxNode is InterfaceDeclarationSyntax))
-                                      .OfType<InterfaceDeclarationSyntax>()
-                                      .ToArray();
-                    var typeDeclarationSyntaxSource = new TypeDeclarationSyntaxSource { Compilation = compilation, SemanticModel = compilation.GetSemanticModel(syntaxTree) };
-
-                    if (classDeclarations.Any())
-                    {
-                        foreach (var classDeclarationSyntax in classDeclarations)
-                        {
-                            Console.WriteLine("[{0}]", string.Join(", ", classDeclarationSyntax.AttributeLists.SelectMany(a => a.Attributes).Select(x => x.Name)));
-                            Console.WriteLine(classDeclarationSyntax.Identifier.Value);
-                            Console.WriteLine();
-
-                            this.allClasses.Add(new KeyValuePair<ClassDeclarationSyntax, TypeDeclarationSyntaxSource>(classDeclarationSyntax, typeDeclarationSyntaxSource));
-                        }
-                        //Console.WriteLine("Attributes: {0}", string.Join(", ", attributes.Select(a => a.Name)));
-                    }
-
-                    //GenerateFactoriesForAttributedClasses(classDeclarations, interfaceDeclarations, semanticModel);
-
-                    this.allInterfaces.AddRange(interfaceDeclarations);
-                    foreach (var interfaceDeclarationSyntax in interfaceDeclarations)
-                    {
-                        this.allInterfacesDictionary.Add(interfaceDeclarationSyntax, typeDeclarationSyntaxSource);
-                    }
-                }
+                tasksList.Add(this.GenerateFactoriesInProjectAsync(compilation));
             }
 
-            foreach (var keyValuePair in this.allClasses)
-            {
-                this.GenerateFactoryForClass(keyValuePair.Key, keyValuePair.Value);
-
-                Console.WriteLine(new string('-', 80));
-            }
+            await Task.WhenAll(tasksList);
 
             this.workspace.TryApplyChanges(this.solution);
+
+            chrono.Stop();
+
+            var ellapsedTime = TimeSpan.FromMilliseconds(chrono.ElapsedMilliseconds);
+
+            Console.WriteLine("Completed in {0}", ellapsedTime);
         }
 
         #endregion
@@ -104,10 +68,10 @@
 
         private static string BuildFactoryImplementationConstructorsCodeSection(string factoryImplementationTypeName,
                                                                                 ClassDeclarationSyntax concreteClassDeclarationSyntax,
-                                                                                IParameterSymbol[] injectedParameters)
+                                                                                ICollection<IParameterSymbol> injectedParameters)
         {
             var factoryConstructorsStringBuilder = new StringBuilder();
-            if (injectedParameters.Length > 0)
+            if (injectedParameters.Count > 0)
             {
                 var allConstructorAttributes = concreteClassDeclarationSyntax.Members.OfType<ConstructorDeclarationSyntax>()
                                                                              .SelectMany(cs => cs.AttributeLists.SelectMany(al => al.Attributes))
@@ -121,7 +85,7 @@
                     factoryConstructorsStringBuilder.AppendLine(string.Format("        [{0}]", string.Join(", ", allConstructorAttributes.Select(cs => cs.ToString()))));
                 }
 
-                if (injectedParameters.Length == 1)
+                if (injectedParameters.Count == 1)
                 {
                     factoryConstructorsStringBuilder.AppendFormat(@"        public {0}({1})",
                                                                   factoryImplementationTypeName,
@@ -194,7 +158,6 @@
                     var selectedConstructor = concreteClassSymbol.InstanceConstructors
                                                                  .Single(c => c.Parameters.Select(cp => cp.Name)
                                                                                .Intersect(factoryMethodParameters.Select(fmp => fmp.Name)).Count() == factoryMethodParameterCount);
-                    //var factoryMethodDeclarationSyntax = (MethodDeclarationSyntax)factoryMethod.DeclaringSyntaxReferences[0].GetSyntax();
 
                     var parameterListAsText = factoryMethodParameters.Select(p =>
                                                                              {
@@ -298,7 +261,7 @@
         }
 
         private static string GetParameterListCodeSection(IMethodSymbol constructor,
-                                                          IParameterSymbol[] injectedParameters)
+                                                          IEnumerable<IParameterSymbol> injectedParameters)
         {
             var parametersRepresentation = constructor.Parameters.Select(parameter =>
                                                                          string.Format("{0}{1}{2}",
@@ -327,21 +290,45 @@
             return typeName.Replace("<", "{").Replace(">", "}");
         }
 
-        private void GenerateFactoryForClass(ClassDeclarationSyntax concreteClassDeclarationSyntax,
-                                             TypeDeclarationSyntaxSource concreteClassDeclarationSyntaxSource)
+        private async Task GenerateFactoriesInProjectAsync(Compilation compilation)
         {
-            Func<AttributeSyntax, bool> predicate = (a => a.Name.ToFullString() == "GenerateT4Factory");
-
-            var attributes = concreteClassDeclarationSyntax.AttributeLists.SelectMany(a => a.Attributes);
-            var factoryAttribute = attributes.Single(predicate);
-            var expandedFactoryAttribute = Simplifier.Expand(factoryAttribute, concreteClassDeclarationSyntaxSource.SemanticModel, this.workspace);
-
-            InterfaceDeclarationSyntax factoryInterfaceDeclarationSyntax;
-            if (expandedFactoryAttribute.ArgumentList != null && expandedFactoryAttribute.ArgumentList.Arguments.Any())
+            foreach (var syntaxTree in compilation.SyntaxTrees)
             {
-                var typeOfArgument =
-                    (TypeOfExpressionSyntax)expandedFactoryAttribute.ArgumentList.Arguments.Single().Expression;
-                factoryInterfaceDeclarationSyntax = this.GetInterfaceTypeDeclaration(typeOfArgument.Type);
+                var syntaxRootNode = await syntaxTree.GetRootAsync();
+                var classDeclarations =
+                    syntaxRootNode.DescendantNodesAndSelf(syntaxNode => !(syntaxNode is ClassDeclarationSyntax))
+                                  .OfType<ClassDeclarationSyntax>()
+                                  .Where(classDeclarationSyntax => classDeclarationSyntax.AttributeLists.Count > 0 && classDeclarationSyntax.AttributeLists.SelectMany(a => a.Attributes).Any(x => x.Name.ToString() == "GenerateT4Factory"))
+                                  .ToArray();
+
+                if (classDeclarations.Any())
+                {
+                    foreach (var classDeclarationSyntax in classDeclarations)
+                    {
+                        Console.WriteLine("[{0}]", string.Join(", ", classDeclarationSyntax.AttributeLists.SelectMany(a => a.Attributes).Select(x => x.Name)));
+                        Console.WriteLine(classDeclarationSyntax.Identifier.Value);
+                        Console.WriteLine();
+
+                        var resolvedConcreteClassType = compilation.GetTypeByMetadataName(GetDeclarationFullName(classDeclarationSyntax));
+
+                        this.GenerateFactoryForClass(classDeclarationSyntax, resolvedConcreteClassType);
+
+                        Console.WriteLine(new string('-', 80));
+                    }
+                }
+            }
+        }
+
+        private void GenerateFactoryForClass(ClassDeclarationSyntax concreteClassDeclarationSyntax,
+                                             INamedTypeSymbol concreteClassTypeSymbol)
+        {
+            var factoryAttribute = concreteClassTypeSymbol.GetAttributes().Single(a => a.AttributeClass.ToString() == "T4Factories.GenerateT4FactoryAttribute");
+
+            INamedTypeSymbol factoryInterfaceTypeSymbol;
+            if (factoryAttribute.ConstructorArguments != null && factoryAttribute.ConstructorArguments.Any())
+            {
+                var typeOfArgument = factoryAttribute.ConstructorArguments.Single();
+                factoryInterfaceTypeSymbol = (INamedTypeSymbol)typeOfArgument.Value;
             }
             else
             {
@@ -349,47 +336,34 @@
             }
 
             var factoryClassGenericName = GetFactoryClassGenericName(concreteClassDeclarationSyntax);
-            var factoryInterfaceFullName = GetDeclarationFullName(factoryInterfaceDeclarationSyntax);
+            var factoryInterfaceFullName = factoryInterfaceTypeSymbol.ToString();
 
             Console.WriteLine("Rendering factory implementation {0}\r\n\tfor class {1}\r\n\ttargeting {2}...", factoryClassGenericName, factoryInterfaceFullName, GetDeclarationFullName(concreteClassDeclarationSyntax));
 
-            this.RenderFactoryImplementation(concreteClassDeclarationSyntax, factoryInterfaceDeclarationSyntax, GetSafeFileName(factoryClassGenericName));
-        }
-
-        private InterfaceDeclarationSyntax GetInterfaceTypeDeclaration(TypeSyntax type)
-        {
-            var typeFullName = type.ToString();
-
-            return this.allInterfaces.Single(itd => string.Format("global::{0}", GetDeclarationFullName(itd)) == typeFullName);
+            this.RenderFactoryImplementation(concreteClassDeclarationSyntax, concreteClassTypeSymbol, factoryInterfaceTypeSymbol, GetSafeFileName(factoryClassGenericName));
         }
 
         private void RenderFactoryImplementation(ClassDeclarationSyntax concreteClassDeclarationSyntax,
-                                                 InterfaceDeclarationSyntax factoryInterfaceDeclarationSyntax,
+                                                 INamedTypeSymbol concreteClassTypeSymbol,
+                                                 INamedTypeSymbol factoryInterfaceTypeSymbol,
                                                  string factoryName)
         {
             var fileName = string.Format("{0}.Generated.cs", factoryName);
-            var factoryInterfaceFullName = GetDeclarationFullName(factoryInterfaceDeclarationSyntax);
 
-            var factoryInterfaceCompilation = this.allInterfacesDictionary[factoryInterfaceDeclarationSyntax].Compilation;
-            var concreteClassCompilation = this.allClasses.Single(kvp => kvp.Key == concreteClassDeclarationSyntax).Value.Compilation; // TODO: Improve data structure
-            var resolvedFactoryInterfaceType = factoryInterfaceCompilation.GetTypeByMetadataName(factoryInterfaceFullName);
-            var resolvedConcreteClassType = concreteClassCompilation.GetTypeByMetadataName(GetDeclarationFullName(concreteClassDeclarationSyntax));
-            var usingsToFilterOut = new[] { "T4Factories", GetDeclarationNamespaceFullName(concreteClassDeclarationSyntax) };
+            var usingsToFilterOut = new[] { "T4Factories", concreteClassTypeSymbol.ContainingNamespace.ToString() };
             var outerUsingDeclarations = FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<CompilationUnitSyntax>().Usings, usingsToFilterOut);
             var innerUsingDeclarations = FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<NamespaceDeclarationSyntax>().Usings, usingsToFilterOut);
 
-            var allConstructorParameters = resolvedConcreteClassType.Constructors
-                                                                    .Where(c => c.DeclaredAccessibility == Accessibility.Public)
-                                                                    .SelectMany(constructor => constructor.Parameters)
-                                                                    .ToArray();
-            var contractTypeMethods = resolvedFactoryInterfaceType != null
-                                          ? resolvedFactoryInterfaceType.GetMembers().OfType<IMethodSymbol>().ToArray()
-                                          : new IMethodSymbol[0];
+            var allConstructorParameters = concreteClassTypeSymbol.Constructors
+                                                                  .Where(c => c.DeclaredAccessibility == Accessibility.Public)
+                                                                  .SelectMany(constructor => constructor.Parameters)
+                                                                  .ToArray();
+            var contractTypeMethods = factoryInterfaceTypeSymbol.GetMembers().OfType<IMethodSymbol>().ToArray();
             var allContractMethodParameters = contractTypeMethods.SelectMany(contractTypeMethod => contractTypeMethod.Parameters).ToArray();
-            if (resolvedFactoryInterfaceType != null && !contractTypeMethods.Any())
+            if (!contractTypeMethods.Any())
             {
                 Console.WriteLine("No Methods! Looking for parent interfaces...");
-                foreach (var factoryParentInterfaceContractType in resolvedFactoryInterfaceType.AllInterfaces)
+                foreach (var factoryParentInterfaceContractType in factoryInterfaceTypeSymbol.AllInterfaces)
                 {
                     Console.WriteLine("  inheritedFrom = {0}", factoryParentInterfaceContractType.ToDisplayString());
 
@@ -407,7 +381,7 @@
 
             var factoryFieldsCodeSection = BuildFactoryImplementationFieldsCodeSection(injectedParameters);
             var factoryConstructorsCodeSection = BuildFactoryImplementationConstructorsCodeSection(factoryName, concreteClassDeclarationSyntax, injectedParameters);
-            var factoryMethodsCodeSection = BuildFactoryImplementationMethodsCodeSection(resolvedConcreteClassType, resolvedFactoryInterfaceType, injectedParameters);
+            var factoryMethodsCodeSection = BuildFactoryImplementationMethodsCodeSection(concreteClassTypeSymbol, factoryInterfaceTypeSymbol, injectedParameters);
 
             var code = @"#pragma warning disable 1591
 
@@ -431,7 +405,7 @@
                                                  ? string.Format("\r\n{0}", innerUsingDeclarations.ToFullString())
                                                  : string.Empty)
                 .Replace("<#=factoryTypeName#>", GetFactoryClassGenericName(concreteClassDeclarationSyntax))
-                .Replace("<#=factoryContractTypeFullName#>", GetDeclarationFullName(factoryInterfaceDeclarationSyntax))
+                .Replace("<#=factoryContractTypeFullName#>", factoryInterfaceTypeSymbol.ToString())
                 .Replace("<#=GeneratedCodeAttribute#>", "global::System.CodeDom.Compiler.GeneratedCode(\"AutoGenFactories\", \"0.1\")")
                 .Replace("<#=concreteXmlDocSafeTypeName#>", GetXmlDocSafeTypeName(GetDeclarationFullName(concreteClassDeclarationSyntax)))
                 .Replace("<#=factoryFields#>", factoryFieldsCodeSection)
@@ -463,16 +437,5 @@
         }
 
         #endregion
-
-        private class TypeDeclarationSyntaxSource
-        {
-            #region Public Properties
-
-            public Compilation Compilation { get; set; }
-
-            public SemanticModel SemanticModel { get; set; }
-
-            #endregion
-        }
     }
 }
