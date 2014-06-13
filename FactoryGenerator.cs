@@ -9,11 +9,19 @@
     using System.Threading;
     using System.Threading.Tasks;
 
+    using Common.Logging;
+
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
 
     public class FactoryGenerator
     {
+        #region Static Fields
+
+        private static readonly ILog Logger = LogManager.GetLogger<FactoryGenerator>();
+
+        #endregion
+
         #region Fields
 
         private readonly string[] attributeImportList;
@@ -77,7 +85,7 @@
 
             var ellapsedTime = TimeSpan.FromMilliseconds(chrono.ElapsedMilliseconds);
 
-            Console.WriteLine("Completed in {0}", ellapsedTime);
+            Logger.DebugFormat("Completed in {0}", ellapsedTime);
         }
 
         #endregion
@@ -448,9 +456,8 @@
                 {
                     foreach (var classDeclarationSyntax in classDeclarations)
                     {
-                        Console.WriteLine("[{0}]", string.Join(", ", classDeclarationSyntax.AttributeLists.SelectMany(a => a.Attributes).Select(x => x.Name)));
-                        Console.WriteLine(classDeclarationSyntax.Identifier.Value);
-                        Console.WriteLine();
+                        Logger.DebugFormat("[{0}]", string.Join(", ", classDeclarationSyntax.AttributeLists.SelectMany(a => a.Attributes).Select(x => x.Name)));
+                        Logger.Debug(classDeclarationSyntax.Identifier.Value);
 
                         var fullyQualifiedMetadataName = GetDeclarationFullName(classDeclarationSyntax);
                         var resolvedConcreteClassType = compilation.GetTypeByMetadataName(fullyQualifiedMetadataName);
@@ -458,7 +465,7 @@
                         var generatedFilePath = this.GenerateFactoryForClass(classDeclarationSyntax, resolvedConcreteClassType);
                         generatedFactoriesList.Add(generatedFilePath);
 
-                        Console.WriteLine(new string('-', 80));
+                        Logger.Debug(new string('-', 80));
                     }
                 }
             }
@@ -490,7 +497,7 @@
             var factoryClassGenericName = GetFactoryClassGenericName(concreteClassDeclarationSyntax);
             var factoryInterfaceFullName = factoryInterfaceTypeSymbol.ToString();
 
-            Console.WriteLine("Rendering factory implementation {0}\r\n\tfor factory interface {1}\r\n\ttargeting {2}...", factoryClassGenericName, factoryInterfaceFullName, GetDeclarationFullName(concreteClassDeclarationSyntax));
+             Logger.InfoFormat("Rendering factory implementation {0}\r\n\tfor factory interface {1}\r\n\ttargeting {2}...", factoryClassGenericName, factoryInterfaceFullName, GetDeclarationFullName(concreteClassDeclarationSyntax));
 
             var generatedFilePath = this.RenderFactoryImplementation(concreteClassDeclarationSyntax, concreteClassTypeSymbol, factoryInterfaceTypeSymbol, GetSafeFileName(factoryClassGenericName));
 
@@ -531,16 +538,16 @@
             var allContractMethodParameters = contractTypeMethods.SelectMany(contractTypeMethod => contractTypeMethod.Parameters).ToArray();
             if (!contractTypeMethods.Any())
             {
-                Console.WriteLine("No Methods! Looking for parent interfaces...");
+                Logger.Warn("No Methods! Looking for parent interfaces...");
                 foreach (var factoryParentInterfaceContractType in factoryInterfaceTypeSymbol.AllInterfaces)
                 {
-                    Console.WriteLine("  inheritedFrom = {0}", factoryParentInterfaceContractType.ToDisplayString());
+                    Logger.DebugFormat("  inheritedFrom = {0}", factoryParentInterfaceContractType.ToDisplayString());
 
                     contractTypeMethods = factoryParentInterfaceContractType.GetMembers().OfType<IMethodSymbol>().ToArray();
                     allContractMethodParameters = contractTypeMethods.SelectMany(contractTypeMethod => contractTypeMethod.Parameters).ToArray();
                     var parametersString = string.Join(", ", allContractMethodParameters.Select(x => x.Name));
 
-                    Console.WriteLine("  parameters from inheritance : {0}", parametersString);
+                    Logger.DebugFormat("  parameters from inheritance : {0}", parametersString);
                 }
             }
 
