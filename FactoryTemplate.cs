@@ -109,14 +109,10 @@
 
         #region Methods
 
-        private static string BuildFactoryImplementationFieldsCodeSection(IEnumerable<IParameterSymbol> allConstructorParameters,
-                                                                          IParameterSymbol[] allContractMethodParameters)
+        private static string BuildFactoryImplementationFieldsCodeSection(IParameterSymbol[] injectedParameters)
         {
             var fieldsStringBuilder = new StringBuilder();
-            var injectedParameters = (from parameter in allConstructorParameters
-                                      where !allContractMethodParameters.Any(contractMethodParameter => CompareParameters(contractMethodParameter, parameter))
-                                      select parameter).ToArray();
-            if (injectedParameters.Any())
+            if (injectedParameters.Length > 0)
             {
                 fieldsStringBuilder.AppendLine("        #region Fields");
                 fieldsStringBuilder.AppendLine();
@@ -136,15 +132,55 @@
             return fieldsStringBuilder.ToString();
         }
 
+        private static string GetParameterListCodeSection(ParameterListSyntax parameterList, Func<ParameterSyntax, bool> isField)
+        {
+            var parametersRepresentation = parameterList.Parameters.Select(parameter =>
+                                                                           string.Format("{0}{1}{2}",
+                                                                                         isField(parameter)
+                                                                                             ? "this."
+                                                                                             : string.Empty,
+                                                                                         string.Empty/*GetParameterModifiers(parameter)*/,
+                                                                                         parameter.Identifier.Text));
+            if (parameterList.Parameters.Count > 1)
+            {
+                return string.Format("\r\n                {0}", string.Join(", \r\n                ", parametersRepresentation));
+            }
+
+            return string.Join(", ", parametersRepresentation);
+        }
+
+        private static string BuildFactoryImplementationConstructorsCodeSection(string factoryImplementationTypeName,
+                                                                                IParameterSymbol[] injectedParameters)
+        {
+            var factoryConstructorsStringBuilder = new StringBuilder();
+            if (injectedParameters.Length > 0)
+            {
+                
+                factoryConstructorsStringBuilder.AppendLine("        #region Constructors");
+                factoryConstructorsStringBuilder.AppendLine();
+
+                factoryConstructorsStringBuilder.AppendFormat(@"        public {0}(
+            {1})
+        {{
+            {2}
+        }}",
+                                                              factoryImplementationTypeName,
+                                                              string.Join(",\r\n            ", injectedParameters.Select(p => p.DeclaringSyntaxReferences[0].GetSyntax().ToString())),
+                                                              string.Join("\r\n            ", injectedParameters.Select(p => string.Format("this.{0} = {0};", p.Name))));
+                factoryConstructorsStringBuilder.AppendLine();
+                factoryConstructorsStringBuilder.AppendLine();
+
+                factoryConstructorsStringBuilder.AppendLine("        #endregion");
+                factoryConstructorsStringBuilder.AppendLine();
+            }
+
+            return factoryConstructorsStringBuilder.ToString();
+        }
+
         private static string BuildFactoryImplementationMethodsCodeSection(ClassDeclarationSyntax concreteClassDeclarationSyntax,
                                                                            InterfaceDeclarationSyntax contractInterfaceDeclarationSyntax,
-                                                                           IEnumerable<IParameterSymbol> allConstructorParameters,
-                                                                           IEnumerable<IParameterSymbol> allContractMethodParameters)
+                                                                           IParameterSymbol[] injectedParameters)
         {
-            var injectedParameters = (from parameter in allConstructorParameters
-                                      where !allContractMethodParameters.Any(contractMethodParameter => CompareParameters(contractMethodParameter, parameter))
-                                      select parameter).ToArray();
-
             var factoryMethodsStringBuilder = new StringBuilder();
             var constructors = concreteClassDeclarationSyntax.Members.OfType<ConstructorDeclarationSyntax>().ToArray();
             if (constructors.Any())
@@ -154,13 +190,34 @@
 
                 foreach (var constructor in constructors)
                 {
-                    var parameterListSyntax = constructor.ParameterList;
-                    foreach (var injectedParameter in injectedParameters.Where(injectedParameter => parameterListSyntax.Parameters.Any(ps => ps.Identifier.Text == injectedParameter.Name)))
-                    {
-                        parameterListSyntax = parameterListSyntax.Parameters.Remove();
-                    }
+                    var contractInterfaceDeclarationFullName = GetDeclarationFullName(contractInterfaceDeclarationSyntax);
+                    var parameterListSyntax = RemoveInjectedParametersFromList(constructor.ParameterList, injectedParameters);
 
-                    factoryMethodsStringBuilder.AppendFormat("        public {0} Create{1};", GetDeclarationFullName(contractInterfaceDeclarationSyntax), parameterListSyntax);
+                    if (parameterListSyntax.Parameters.Count > 1)
+                    {
+                        factoryMethodsStringBuilder.AppendFormat(
+@"        public {0} Create(
+            {1})
+        {{
+            return new {2}({3});
+        }}",
+                                                                 contractInterfaceDeclarationFullName,
+                                                                 string.Join(",\r\n            ", parameterListSyntax.Parameters),
+                                                                 GetDeclarationFullName(concreteClassDeclarationSyntax),
+                                                                 GetParameterListCodeSection(constructor.ParameterList, parameter => injectedParameters.Any(injectedParameter => injectedParameter.Name == parameter.Identifier.Text)));
+                    }
+                    else
+                    {
+                        factoryMethodsStringBuilder.AppendFormat(
+@"        public {0} Create{1}
+        {{
+            return new {2}({3});
+        }}",
+                                                                 contractInterfaceDeclarationFullName,
+                                                                 parameterListSyntax.NormalizeWhitespace(),
+                                                                 GetDeclarationFullName(concreteClassDeclarationSyntax),
+                                                                 GetParameterListCodeSection(constructor.ParameterList, parameter => injectedParameters.Any(injectedParameter => injectedParameter.Name == parameter.Identifier.Text)));
+                    }
                     factoryMethodsStringBuilder.AppendLine();
                     factoryMethodsStringBuilder.AppendLine();
                 }
@@ -222,6 +279,15 @@
         private static string GetXmlDocSafeTypeName(string typeName)
         {
             return typeName.Replace("<", "{").Replace(">", "}");
+        }
+
+        private static ParameterListSyntax RemoveInjectedParametersFromList(ParameterListSyntax parameterListSyntax,
+                                                                            IEnumerable<IParameterSymbol> injectedParameters)
+        {
+            var parametersToRemove = parameterListSyntax.Parameters
+                                                        .Where(parameterSyntax => injectedParameters.Any(injectedParameterSymbol => injectedParameterSymbol.Name == parameterSyntax.Identifier.Text));
+            parameterListSyntax = parameterListSyntax.RemoveNodes(parametersToRemove, SyntaxRemoveOptions.KeepExteriorTrivia);
+            return parameterListSyntax;
         }
 
         private SyntaxList<UsingDirectiveSyntax> FilterOutUsings(SyntaxList<UsingDirectiveSyntax> usings,
@@ -435,8 +501,13 @@
                 }
             }
 
-            var factoryFieldsCodeSection = BuildFactoryImplementationFieldsCodeSection(allConstructorParameters, allContractMethodParameters);
-            var factoryMethodsCodeSection = BuildFactoryImplementationMethodsCodeSection(concreteClassDeclarationSyntax, contractInterfaceDeclarationSyntax, allConstructorParameters, allContractMethodParameters);
+            var injectedParameters = (from parameter in (IEnumerable<IParameterSymbol>)allConstructorParameters
+                                      where !allContractMethodParameters.Any(contractMethodParameter => CompareParameters(contractMethodParameter, parameter))
+                                      select parameter).ToArray();
+
+            var factoryFieldsCodeSection = BuildFactoryImplementationFieldsCodeSection(injectedParameters);
+            var factoryConstructorsCodeSection = BuildFactoryImplementationConstructorsCodeSection(factoryName, injectedParameters);
+            var factoryMethodsCodeSection = BuildFactoryImplementationMethodsCodeSection(concreteClassDeclarationSyntax, contractInterfaceDeclarationSyntax, injectedParameters);
 
             var code = @"#pragma warning disable 1591
 
@@ -450,6 +521,7 @@
     public partial class <#=factoryTypeName#> : <#=factoryContractTypeFullName#>
     {
 <#=factoryFields#>
+<#=factoryConstructors#>
 <#=factoryMethods#>
     }
 }"
@@ -465,6 +537,7 @@
                 .Replace("<#=GeneratedCodeAttribute#>", "global::System.CodeDom.Compiler.GeneratedCode(\"AutoGenFactories\", \"0.1\")")
                 .Replace("<#=concreteXmlDocSafeTypeName#>", GetXmlDocSafeTypeName(GetDeclarationFullName(concreteClassDeclarationSyntax)))
                 .Replace("<#=factoryFields#>", factoryFieldsCodeSection)
+                .Replace("<#=factoryConstructors#>", factoryConstructorsCodeSection)
                 .Replace("<#=factoryMethods#>", factoryMethodsCodeSection);
 
             var project = this.solution.Projects.First(proj => proj.GetDocument(concreteClassDeclarationSyntax.SyntaxTree) != null);

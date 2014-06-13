@@ -107,8 +107,6 @@
             Console.WriteLine(code);
 
             var assembly = CompileCodeIntoAssembly(code, @"C:\a.cs");*/
-
-            Console.ReadKey();
         }
 
         #endregion
