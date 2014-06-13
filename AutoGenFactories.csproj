@@ -33,6 +33,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="CommandLine">
+      <HintPath>packages\CommandLineParser.1.9.71\lib\net45\CommandLine.dll</HintPath>
+    </Reference>
     <Reference Include="Microsoft.CodeAnalysis">
       <HintPath>packages\Microsoft.CodeAnalysis.Common.0.6.4033103-beta\lib\net45\Microsoft.CodeAnalysis.dll</HintPath>
     </Reference>
@@ -56,6 +59,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CommandLineOptions.cs" />
     <Compile Include="FactoryGenerator.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

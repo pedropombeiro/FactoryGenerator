@@ -17,6 +17,8 @@
 
         private readonly Workspace workspace;
 
+        private readonly bool writeXmlDoc;
+
         private Solution solution;
 
         #endregion
@@ -25,10 +27,12 @@
 
         [DebuggerStepThrough]
         public FactoryGenerator(Workspace workspace,
-                               Solution solution)
+                                Solution solution,
+                                bool writeXmlDoc)
         {
             this.workspace = workspace;
             this.solution = solution;
+            this.writeXmlDoc = writeXmlDoc;
         }
 
         #endregion
@@ -136,88 +140,6 @@
             return fieldsStringBuilder.ToString();
         }
 
-        private static string BuildFactoryImplementationMethodsCodeSection(INamedTypeSymbol concreteClassSymbol,
-                                                                           INamedTypeSymbol factoryInterfaceSymbol,
-                                                                           IParameterSymbol[] injectedParameters)
-        {
-            var factoryMethodsStringBuilder = new StringBuilder();
-            var factoryMethods = factoryInterfaceSymbol.GetMembers()
-                                                       .OfType<IMethodSymbol>()
-                                                       .Where(methodSymbol => concreteClassSymbol.AllInterfaces.Contains(methodSymbol.ReturnType))
-                                                       .ToArray();
-
-            if (factoryMethods.Any())
-            {
-                factoryMethodsStringBuilder.AppendLine("        #region Public Factory Methods");
-                factoryMethodsStringBuilder.AppendLine();
-
-                foreach (var factoryMethod in factoryMethods)
-                {
-                    var factoryMethodParameters = factoryMethod.Parameters;
-                    var factoryMethodParameterCount = factoryMethodParameters.Count();
-                    var selectedConstructor = concreteClassSymbol.InstanceConstructors
-                                                                 .Single(c => c.Parameters.Select(cp => cp.Name)
-                                                                               .Intersect(factoryMethodParameters.Select(fmp => fmp.Name)).Count() == factoryMethodParameterCount);
-
-                    var parameterListAsText = factoryMethodParameters.Select(p =>
-                                                                             {
-                                                                                 var attributes = p.GetAttributes();
-                                                                                 var attributeSection = attributes.Any()
-                                                                                                            ? string.Format("[{0}] ", string.Join(", ", attributes.Select(a => a.ToString())))
-                                                                                                            : string.Empty;
-
-                                                                                 return string.Format("{0}{1} {2}", attributeSection, p.Type, p.Name);
-                                                                             });
-
-#if WRITEXMLDOC
-                    var documentationCommentXml = factoryMethod.GetDocumentationCommentXml();
-                    if (!string.IsNullOrWhiteSpace(documentationCommentXml))
-                    {
-                        var relevantLines = documentationCommentXml.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                                                                   .SkipWhile(line => !line.StartsWith(" "))
-                                                                   .TakeWhile(line => line != "</member>")
-                                                                   .ToArray();
-                        var indent = relevantLines.First().Length - relevantLines.First().TrimStart().Length;
-                        var relevantLinesAsXmlDoc = relevantLines.Select(line => string.Format("        /// {0}", line.Substring(indent)));
-
-                        factoryMethodsStringBuilder.AppendLine(string.Join("\r\n", relevantLinesAsXmlDoc));
-                    }
-#endif
-                    if (factoryMethodParameters.Length > 1)
-                    {
-                        factoryMethodsStringBuilder.AppendFormat(
-                                                                 @"        public {0} Create(
-            {1})
-        {{
-            return new {2}({3});
-        }}",
-                                                                 factoryMethod.ReturnType,
-                                                                 string.Join(",\r\n            ", parameterListAsText),
-                                                                 concreteClassSymbol,
-                                                                 GetParameterListCodeSection(selectedConstructor, injectedParameters));
-                    }
-                    else
-                    {
-                        factoryMethodsStringBuilder.AppendFormat(
-                                                                 @"        public {0} Create({1})
-        {{
-            return new {2}({3});
-        }}",
-                                                                 factoryMethod.ReturnType,
-                                                                 string.Join(", ", parameterListAsText),
-                                                                 concreteClassSymbol,
-                                                                 GetParameterListCodeSection(selectedConstructor, injectedParameters));
-                    }
-                    factoryMethodsStringBuilder.AppendLine();
-                    factoryMethodsStringBuilder.AppendLine();
-                }
-
-                factoryMethodsStringBuilder.Append("        #endregion");
-            }
-
-            return factoryMethodsStringBuilder.ToString();
-        }
-
         private static bool CompareParameters(IParameterSymbol parameter1,
                                               IParameterSymbol parameter2)
         {
@@ -287,6 +209,90 @@
         private static string GetXmlDocSafeTypeName(string typeName)
         {
             return typeName.Replace("<", "{").Replace(">", "}");
+        }
+
+        private string BuildFactoryImplementationMethodsCodeSection(INamedTypeSymbol concreteClassSymbol,
+                                                                    INamedTypeSymbol factoryInterfaceSymbol,
+                                                                    IParameterSymbol[] injectedParameters)
+        {
+            var factoryMethodsStringBuilder = new StringBuilder();
+            var factoryMethods = factoryInterfaceSymbol.GetMembers()
+                                                       .OfType<IMethodSymbol>()
+                                                       .Where(methodSymbol => concreteClassSymbol.AllInterfaces.Contains(methodSymbol.ReturnType))
+                                                       .ToArray();
+
+            if (factoryMethods.Any())
+            {
+                factoryMethodsStringBuilder.AppendLine("        #region Public Factory Methods");
+                factoryMethodsStringBuilder.AppendLine();
+
+                foreach (var factoryMethod in factoryMethods)
+                {
+                    var factoryMethodParameters = factoryMethod.Parameters;
+                    var factoryMethodParameterCount = factoryMethodParameters.Count();
+                    var selectedConstructor = concreteClassSymbol.InstanceConstructors
+                                                                 .Single(c => c.Parameters.Select(cp => cp.Name)
+                                                                               .Intersect(factoryMethodParameters.Select(fmp => fmp.Name)).Count() == factoryMethodParameterCount);
+
+                    var parameterListAsText = factoryMethodParameters.Select(p =>
+                                                                             {
+                                                                                 var attributes = p.GetAttributes();
+                                                                                 var attributeSection = attributes.Any()
+                                                                                                            ? string.Format("[{0}] ", string.Join(", ", attributes.Select(a => a.ToString())))
+                                                                                                            : string.Empty;
+
+                                                                                 return string.Format("{0}{1} {2}", attributeSection, p.Type, p.Name);
+                                                                             });
+
+                    if (this.writeXmlDoc)
+                    {
+                        var documentationCommentXml = factoryMethod.GetDocumentationCommentXml();
+                        if (!string.IsNullOrWhiteSpace(documentationCommentXml))
+                        {
+                            var relevantLines = documentationCommentXml.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                                                                       .SkipWhile(line => !line.StartsWith(" "))
+                                                                       .TakeWhile(line => line != "</member>")
+                                                                       .ToArray();
+                            var indent = relevantLines.First().Length - relevantLines.First().TrimStart().Length;
+                            var relevantLinesAsXmlDoc = relevantLines.Select(line => string.Format("        /// {0}", line.Substring(indent)));
+
+                            factoryMethodsStringBuilder.AppendLine(string.Join("\r\n", relevantLinesAsXmlDoc));
+                        }
+                    }
+
+                    if (factoryMethodParameters.Length > 1)
+                    {
+                        factoryMethodsStringBuilder.AppendFormat(
+                                                                 @"        public {0} Create(
+            {1})
+        {{
+            return new {2}({3});
+        }}",
+                                                                 factoryMethod.ReturnType,
+                                                                 string.Join(",\r\n            ", parameterListAsText),
+                                                                 concreteClassSymbol,
+                                                                 GetParameterListCodeSection(selectedConstructor, injectedParameters));
+                    }
+                    else
+                    {
+                        factoryMethodsStringBuilder.AppendFormat(
+                                                                 @"        public {0} Create({1})
+        {{
+            return new {2}({3});
+        }}",
+                                                                 factoryMethod.ReturnType,
+                                                                 string.Join(", ", parameterListAsText),
+                                                                 concreteClassSymbol,
+                                                                 GetParameterListCodeSection(selectedConstructor, injectedParameters));
+                    }
+                    factoryMethodsStringBuilder.AppendLine();
+                    factoryMethodsStringBuilder.AppendLine();
+                }
+
+                factoryMethodsStringBuilder.Append("        #endregion");
+            }
+
+            return factoryMethodsStringBuilder.ToString();
         }
 
         private async Task GenerateFactoriesInProjectAsync(Compilation compilation)
@@ -380,7 +386,7 @@
 
             var factoryFieldsCodeSection = BuildFactoryImplementationFieldsCodeSection(injectedParameters);
             var factoryConstructorsCodeSection = BuildFactoryImplementationConstructorsCodeSection(factoryName, concreteClassDeclarationSyntax, injectedParameters);
-            var factoryMethodsCodeSection = BuildFactoryImplementationMethodsCodeSection(concreteClassTypeSymbol, factoryInterfaceTypeSymbol, injectedParameters);
+            var factoryMethodsCodeSection = this.BuildFactoryImplementationMethodsCodeSection(concreteClassTypeSymbol, factoryInterfaceTypeSymbol, injectedParameters);
 
             var code = @"#pragma warning disable 1591
 

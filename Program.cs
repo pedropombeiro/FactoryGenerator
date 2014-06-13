@@ -9,27 +9,48 @@
     {
         #region Methods
 
-        private static async Task GenerateFactoriesAsync()
+        private static async Task GenerateFactoriesAsync(string solutionPath,
+                                                         bool writeXmlDoc)
         {
             var workspace = MSBuildWorkspace.Create();
-            var solution =
-                await workspace.OpenSolutionAsync(@"C:\Users\Pedro\Documents\Liebherr\Lioba\solution\Lioba.sln");
+
+            var solution = await workspace.OpenSolutionAsync(solutionPath);
 
             foreach (var project in solution.Projects)
             {
                 Console.WriteLine(project.Name);
             }
 
-            var factoryTemplate = new FactoryGenerator(workspace, solution);
+            var factoryGenerator = new FactoryGenerator(workspace, solution, writeXmlDoc);
 
-            await factoryTemplate.ExecuteAsync();
+            await factoryGenerator.ExecuteAsync();
         }
 
         private static void Main(string[] args)
         {
-            Console.WriteLine("\n----------------------------------\nT4 Template\n----------------------------------\n");
+            var commandLineOptions = new CommandLineOptions();
+            if (!CommandLine.Parser.Default.ParseArguments(args, commandLineOptions))
+            {
+                Environment.Exit(1);
+            }
 
-            GenerateFactoriesAsync().Wait();
+            try
+            {
+                GenerateFactoriesAsync(commandLineOptions.SolutionPath, commandLineOptions.WriteXmlDoc).Wait();
+            }
+            catch (AggregateException e)
+            {
+                var innerException = e.Flatten().InnerException;
+                Console.WriteLine(innerException);
+
+                if (commandLineOptions.PauseOnError)
+                {
+                    Console.WriteLine("Press any key to exit.");
+                    Console.Read();
+                }
+
+                Environment.Exit(innerException.HResult);
+            }
         }
 
         #endregion
