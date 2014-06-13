@@ -161,9 +161,17 @@
             }
         }
 
-        private static string GetDeclarationFullName(BaseTypeDeclarationSyntax typeDeclarationSyntax)
+        private static string GetDeclarationFullName(TypeDeclarationSyntax typeDeclarationSyntax)
         {
-            var fullyQualifiedName = string.Format("{0}.{1}", GetDeclarationNamespaceFullName(typeDeclarationSyntax), typeDeclarationSyntax.Identifier.ValueText);
+            var typeParameterCount = typeDeclarationSyntax.TypeParameterList == null
+                                         ? 0
+                                         : typeDeclarationSyntax.TypeParameterList.Parameters.Count;
+            var fullyQualifiedName = string.Format("{0}.{1}{2}",
+                                                   GetDeclarationNamespaceFullName(typeDeclarationSyntax),
+                                                   typeDeclarationSyntax.Identifier.ValueText,
+                                                   typeParameterCount == 0
+                                                       ? string.Empty
+                                                       : string.Format("`{0}", typeParameterCount));
 
             return fullyQualifiedName;
         }
@@ -211,6 +219,36 @@
             return typeName.Replace("<", "{").Replace(">", "}");
         }
 
+        private static IMethodSymbol SelectConstructorFromFactoryMethod(IMethodSymbol factoryMethod,
+                                                                        INamedTypeSymbol concreteClassSymbol,
+                                                                        IParameterSymbol[] injectedParameters)
+        {
+            IMethodSymbol selectedConstructor;
+            var factoryMethodParameterCount = factoryMethod.Parameters.Length;
+            var instanceConstructors = concreteClassSymbol.InstanceConstructors;
+
+            if (factoryMethodParameterCount == 0)
+            {
+                selectedConstructor = instanceConstructors.OrderBy(c => c.Parameters.Length)
+                                                          .First(c => !c.Parameters.Select(cp => cp.Name)
+                                                                        .Except(injectedParameters.Select(fmp => fmp.Name)).Any());
+            }
+            else
+            {
+                selectedConstructor = instanceConstructors.OrderByDescending(c => c.Parameters.Length)
+                                                          .First(c =>
+                                                                 {
+                                                                     var parametersInCommon = c.Parameters.Select(cp => cp.Name)
+                                                                                               .Intersect(factoryMethod.Parameters.Select(fmp => fmp.Name))
+                                                                                               .Count();
+
+                                                                     return parametersInCommon == factoryMethodParameterCount;
+                                                                 });
+            }
+
+            return selectedConstructor;
+        }
+
         private string BuildFactoryImplementationMethodsCodeSection(INamedTypeSymbol concreteClassSymbol,
                                                                     INamedTypeSymbol factoryInterfaceSymbol,
                                                                     IParameterSymbol[] injectedParameters)
@@ -228,12 +266,8 @@
 
                 foreach (var factoryMethod in factoryMethods)
                 {
+                    var selectedConstructor = SelectConstructorFromFactoryMethod(factoryMethod, concreteClassSymbol, injectedParameters);
                     var factoryMethodParameters = factoryMethod.Parameters;
-                    var factoryMethodParameterCount = factoryMethodParameters.Count();
-                    var selectedConstructor = concreteClassSymbol.InstanceConstructors
-                                                                 .Single(c => c.Parameters.Select(cp => cp.Name)
-                                                                               .Intersect(factoryMethodParameters.Select(fmp => fmp.Name)).Count() == factoryMethodParameterCount);
-
                     var parameterListAsText = factoryMethodParameters.Select(p =>
                                                                              {
                                                                                  var attributes = p.GetAttributes();
@@ -303,7 +337,11 @@
                 var classDeclarations =
                     syntaxRootNode.DescendantNodesAndSelf(syntaxNode => !(syntaxNode is ClassDeclarationSyntax))
                                   .OfType<ClassDeclarationSyntax>()
-                                  .Where(classDeclarationSyntax => classDeclarationSyntax.AttributeLists.Count > 0 && classDeclarationSyntax.AttributeLists.SelectMany(a => a.Attributes).Any(x => x.Name.ToString() == "GenerateT4Factory"))
+                                  .Where(classDeclarationSyntax => classDeclarationSyntax.AttributeLists.Count > 0 && classDeclarationSyntax.AttributeLists.SelectMany(a => a.Attributes).Any(x =>
+                                                                                                                                                                                              {
+                                                                                                                                                                                                  var attributeClassName = x.Name.ToString();
+                                                                                                                                                                                                  return attributeClassName == "GenerateT4Factory" || attributeClassName == "T4Factories.GenerateT4Factory";
+                                                                                                                                                                                              }))
                                   .ToArray();
 
                 if (classDeclarations.Any())
@@ -314,7 +352,8 @@
                         Console.WriteLine(classDeclarationSyntax.Identifier.Value);
                         Console.WriteLine();
 
-                        var resolvedConcreteClassType = compilation.GetTypeByMetadataName(GetDeclarationFullName(classDeclarationSyntax));
+                        var fullyQualifiedMetadataName = GetDeclarationFullName(classDeclarationSyntax);
+                        var resolvedConcreteClassType = compilation.GetTypeByMetadataName(fullyQualifiedMetadataName);
 
                         this.GenerateFactoryForClass(classDeclarationSyntax, resolvedConcreteClassType);
 
