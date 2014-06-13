@@ -11,7 +11,7 @@
     using Microsoft.CodeAnalysis.CSharp.Syntax;
     using Microsoft.CodeAnalysis.Text;
 
-    public class FactoryTemplate
+    public class FactoryGenerator
     {
         #region Fields
 
@@ -24,7 +24,7 @@
         #region Constructors and Destructors
 
         [DebuggerStepThrough]
-        public FactoryTemplate(Workspace workspace,
+        public FactoryGenerator(Workspace workspace,
                                Solution solution)
         {
             this.workspace = workspace;
