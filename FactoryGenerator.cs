@@ -212,8 +212,7 @@
                     factoryMethodsStringBuilder.AppendLine();
                 }
 
-                factoryMethodsStringBuilder.AppendLine("        #endregion");
-                factoryMethodsStringBuilder.AppendLine();
+                factoryMethodsStringBuilder.Append("        #endregion");
             }
 
             return factoryMethodsStringBuilder.ToString();
