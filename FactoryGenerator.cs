@@ -3,6 +3,7 @@
     using System;
     using System.Collections.Generic;
     using System.Diagnostics;
+    using System.IO;
     using System.Linq;
     using System.Text;
     using System.Threading.Tasks;
@@ -182,6 +183,14 @@
         private static IMethodSymbol SelectConstructorFromFactoryMethod(IMethodSymbol factoryMethod,
                                                                         INamedTypeSymbol concreteClassSymbol)
         {
+            if (!concreteClassSymbol.AllInterfaces.Contains(factoryMethod.ReturnType))
+            {
+                var message = string.Format("The factory method does not return the correct type (i.e. a type inherited by {0}). Are you sure the attribute maps to the correct factory type? Currently it maps to {1}.",
+                                            concreteClassSymbol,
+                                            factoryMethod.ContainingType);
+                throw new InvalidOperationException(message);
+            }
+
             var factoryMethodParameters = factoryMethod.Parameters;
             var instanceConstructors = concreteClassSymbol.InstanceConstructors
                                                           .Where(c => c.DeclaredAccessibility == Accessibility.Public);
@@ -395,7 +404,7 @@
             var factoryClassGenericName = GetFactoryClassGenericName(concreteClassDeclarationSyntax);
             var factoryInterfaceFullName = factoryInterfaceTypeSymbol.ToString();
 
-            Console.WriteLine("Rendering factory implementation {0}\r\n\tfor class {1}\r\n\ttargeting {2}...", factoryClassGenericName, factoryInterfaceFullName, GetDeclarationFullName(concreteClassDeclarationSyntax));
+            Console.WriteLine("Rendering factory implementation {0}\r\n\tfor factory interface {1}\r\n\ttargeting {2}...", factoryClassGenericName, factoryInterfaceFullName, GetDeclarationFullName(concreteClassDeclarationSyntax));
 
             this.RenderFactoryImplementation(concreteClassDeclarationSyntax, concreteClassTypeSymbol, factoryInterfaceTypeSymbol, GetSafeFileName(factoryClassGenericName));
         }
