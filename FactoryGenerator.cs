@@ -6,6 +6,7 @@
     using System.IO;
     using System.Linq;
     using System.Text;
+    using System.Threading;
     using System.Threading.Tasks;
 
     using Microsoft.CodeAnalysis;
@@ -50,16 +51,25 @@
             chrono.Start();
 
             var projectDependencyGraph = await this.solution.GetProjectDependencyGraphAsync();
-            var tasksList = new List<Task>(16);
+            var existingFactoriesTasksList = new List<Task<ICollection<string>>>(16);
+            var newFactoriesTasksList = new List<Task<ICollection<string>>>(16);
             foreach (var projectId in projectDependencyGraph.GetTopologicallySortedProjects())
             {
                 var project = this.solution.GetProject(projectId);
                 var compilation = await project.GetCompilationAsync();
 
-                tasksList.Add(this.GenerateFactoriesInProjectAsync(compilation));
+                var catalogTask = CatalogGeneratedFactoriesInProjectAsync(compilation);
+
+                existingFactoriesTasksList.Add(catalogTask);
+                newFactoriesTasksList.Add(this.GenerateFactoriesInProjectAsync(compilation));
             }
 
-            await Task.WhenAll(tasksList);
+            await Task.WhenAll(existingFactoriesTasksList.Cast<Task>().Concat(newFactoriesTasksList));
+
+            var existingGeneratedFactories = existingFactoriesTasksList.SelectMany(task => task.Result).ToArray();
+            var newGeneratedFactories = newFactoriesTasksList.SelectMany(task => task.Result).ToArray();
+
+            this.RemoveObsoleteFactoriesFromSolution(existingGeneratedFactories, newGeneratedFactories);
 
             this.workspace.TryApplyChanges(this.solution);
 
@@ -100,6 +110,34 @@
             return fieldsStringBuilder.ToString();
         }
 
+        private static async Task<ICollection<string>> CatalogGeneratedFactoriesInProjectAsync(Compilation compilation)
+        {
+            var generatedFactoriesCatalog = new List<string>(16);
+
+            foreach (var syntaxTree in compilation.SyntaxTrees)
+            {
+                var syntaxRootNode = await syntaxTree.GetRootAsync();
+                var generatedFactoryClassDeclarations =
+                    syntaxRootNode.DescendantNodesAndSelf(syntaxNode => !(syntaxNode is ClassDeclarationSyntax))
+                                  .OfType<ClassDeclarationSyntax>()
+                                  .Where(classDeclarationSyntax => classDeclarationSyntax.AttributeLists.Count > 0 && classDeclarationSyntax.AttributeLists.SelectMany(a => a.Attributes).Any(x =>
+                                                                                                                                                                                              {
+                                                                                                                                                                                                  var attributeClassName = x.Name.ToString();
+                                                                                                                                                                                                  return attributeClassName == "global::System.CodeDom.Compiler.GeneratedCode";
+                                                                                                                                                                                              }))
+                                  .ToArray();
+
+                if (generatedFactoryClassDeclarations.Any())
+                {
+                    var generatedFactoryInterfaces = generatedFactoryClassDeclarations.Select(generatedFactoryClassDeclaration => generatedFactoryClassDeclaration.SyntaxTree.FilePath);
+
+                    generatedFactoriesCatalog.AddRange(generatedFactoryInterfaces);
+                }
+            }
+
+            return generatedFactoriesCatalog;
+        }
+
         private static bool CompareParameters(IParameterSymbol parameter1,
                                               IParameterSymbol parameter2)
         {
@@ -121,6 +159,21 @@
             }
         }
 
+        private static Document FindDocumentFromPath(Solution solution,
+                                                     string filePath)
+        {
+            foreach (var project in solution.Projects)
+            {
+                var document = project.Documents.FirstOrDefault(d => d.FilePath == filePath);
+                if (document != null)
+                {
+                    return document;
+                }
+            }
+
+            return null;
+        }
+
         private static string GetDeclarationFullName(TypeDeclarationSyntax typeDeclarationSyntax)
         {
             var typeParameterCount = typeDeclarationSyntax.TypeParameterList == null
@@ -140,6 +193,15 @@
         {
             var namespaceDeclarationSyntax = typeDeclarationSyntax.FirstAncestorOrSelf<NamespaceDeclarationSyntax>();
             return namespaceDeclarationSyntax.Name.ToString();
+        }
+
+        private static AttributeData GetFactoryAttributeFromTypeSymbol(INamedTypeSymbol concreteClassTypeSymbol)
+        {
+            return concreteClassTypeSymbol.GetAttributes().Single(a =>
+                                                                  {
+                                                                      var attributeClassFullName = a.AttributeClass.ToString();
+                                                                      return attributeClassFullName.EndsWith(".GenerateFactoryAttribute");
+                                                                  });
         }
 
         private static string GetFactoryClassGenericName(ClassDeclarationSyntax concreteTypeDeclarationSyntax)
@@ -177,6 +239,21 @@
         private static string GetXmlDocSafeTypeName(string typeName)
         {
             return typeName.Replace("<", "{").Replace(">", "}");
+        }
+
+        private static bool IsTypeDeclarationSyntaxFactoryTarget(ClassDeclarationSyntax classDeclarationSyntax)
+        {
+            var attributeListSyntaxes = classDeclarationSyntax.AttributeLists;
+
+            return attributeListSyntaxes.Count > 0 &&
+                   attributeListSyntaxes.SelectMany(a => a.Attributes).Any(x =>
+                                                                           {
+                                                                               var qualifiedNameSyntax = x.Name as Microsoft.CodeAnalysis.CSharp.Syntax.QualifiedNameSyntax;
+                                                                               var attributeClassName = qualifiedNameSyntax != null
+                                                                                                            ? qualifiedNameSyntax.Right.Identifier.ToString()
+                                                                                                            : x.Name.ToString();
+                                                                               return attributeClassName == "GenerateFactory" || attributeClassName == "GenerateFactoryAttribute";
+                                                                           });
         }
 
         private static IMethodSymbol SelectConstructorFromFactoryMethod(IMethodSymbol factoryMethod,
@@ -323,8 +400,7 @@
 
                     if (factoryMethodParameters.Length > 1)
                     {
-                        factoryMethodsStringBuilder.AppendFormat(
-                                                                 @"        public {0} Create(
+                        factoryMethodsStringBuilder.AppendFormat(@"        public {0} Create(
             {1})
         {{
             return new {2}({3});
@@ -336,8 +412,7 @@
                     }
                     else
                     {
-                        factoryMethodsStringBuilder.AppendFormat(
-                                                                 @"        public {0} Create({1})
+                        factoryMethodsStringBuilder.AppendFormat(@"        public {0} Create({1})
         {{
             return new {2}({3});
         }}",
@@ -356,19 +431,17 @@
             return factoryMethodsStringBuilder.ToString();
         }
 
-        private async Task GenerateFactoriesInProjectAsync(Compilation compilation)
+        private async Task<ICollection<string>> GenerateFactoriesInProjectAsync(Compilation compilation)
         {
+            var generatedFactoriesList = new List<string>();
+
             foreach (var syntaxTree in compilation.SyntaxTrees)
             {
                 var syntaxRootNode = await syntaxTree.GetRootAsync();
                 var classDeclarations =
                     syntaxRootNode.DescendantNodesAndSelf(syntaxNode => !(syntaxNode is ClassDeclarationSyntax))
                                   .OfType<ClassDeclarationSyntax>()
-                                  .Where(classDeclarationSyntax => classDeclarationSyntax.AttributeLists.Count > 0 && classDeclarationSyntax.AttributeLists.SelectMany(a => a.Attributes).Any(x =>
-                                                                                                                                                                                              {
-                                                                                                                                                                                                  var attributeClassName = x.Name.ToString();
-                                                                                                                                                                                                  return attributeClassName == "GenerateT4Factory" || attributeClassName == "T4Factories.GenerateT4Factory";
-                                                                                                                                                                                              }))
+                                  .Where(IsTypeDeclarationSyntaxFactoryTarget)
                                   .ToArray();
 
                 if (classDeclarations.Any())
@@ -382,27 +455,21 @@
                         var fullyQualifiedMetadataName = GetDeclarationFullName(classDeclarationSyntax);
                         var resolvedConcreteClassType = compilation.GetTypeByMetadataName(fullyQualifiedMetadataName);
 
-                        this.GenerateFactoryForClass(classDeclarationSyntax, resolvedConcreteClassType);
+                        var generatedFilePath = this.GenerateFactoryForClass(classDeclarationSyntax, resolvedConcreteClassType);
+                        generatedFactoriesList.Add(generatedFilePath);
 
                         Console.WriteLine(new string('-', 80));
                     }
                 }
             }
+
+            return generatedFactoriesList;
         }
 
-        private void GenerateFactoryForClass(ClassDeclarationSyntax concreteClassDeclarationSyntax,
-                                             INamedTypeSymbol concreteClassTypeSymbol)
+        private string GenerateFactoryForClass(ClassDeclarationSyntax concreteClassDeclarationSyntax,
+                                               INamedTypeSymbol concreteClassTypeSymbol)
         {
-            var factoryAttribute = concreteClassTypeSymbol.GetAttributes().Single(a =>
-                                                                                  {
-                                                                                      var attributeClassFullName = a.AttributeClass.ToString();
-                                                                                      return attributeClassFullName == "T4Factories.GenerateT4FactoryAttribute" ||
-                                                                                             attributeClassFullName == "T4Factories.GenerateT4Factory";
-                                                                                  });
-            if (factoryAttribute.AttributeClass.Kind == SymbolKind.ErrorType)
-            {
-                throw new InvalidOperationException(string.Format("Cannot find the factory type for class {0} because of a compilation error.", GetDeclarationFullName(concreteClassDeclarationSyntax)));
-            }
+            var factoryAttribute = GetFactoryAttributeFromTypeSymbol(concreteClassTypeSymbol);
 
             INamedTypeSymbol factoryInterfaceTypeSymbol;
             if (factoryAttribute.ConstructorArguments != null && factoryAttribute.ConstructorArguments.Any())
@@ -417,7 +484,7 @@
             }
             else
             {
-                throw new InvalidOperationException(string.Format("Factory type must be specified in GenerateT4FactoryAttribute on {0}.", GetDeclarationFullName(concreteClassDeclarationSyntax)));
+                throw new InvalidOperationException(string.Format("Factory type must be specified in {0} on {1}.", factoryAttribute.AttributeClass, GetDeclarationFullName(concreteClassDeclarationSyntax)));
             }
 
             var factoryClassGenericName = GetFactoryClassGenericName(concreteClassDeclarationSyntax);
@@ -425,17 +492,38 @@
 
             Console.WriteLine("Rendering factory implementation {0}\r\n\tfor factory interface {1}\r\n\ttargeting {2}...", factoryClassGenericName, factoryInterfaceFullName, GetDeclarationFullName(concreteClassDeclarationSyntax));
 
-            this.RenderFactoryImplementation(concreteClassDeclarationSyntax, concreteClassTypeSymbol, factoryInterfaceTypeSymbol, GetSafeFileName(factoryClassGenericName));
+            var generatedFilePath = this.RenderFactoryImplementation(concreteClassDeclarationSyntax, concreteClassTypeSymbol, factoryInterfaceTypeSymbol, GetSafeFileName(factoryClassGenericName));
+
+            return generatedFilePath;
         }
 
-        private void RenderFactoryImplementation(ClassDeclarationSyntax concreteClassDeclarationSyntax,
-                                                 INamedTypeSymbol concreteClassTypeSymbol,
-                                                 INamedTypeSymbol factoryInterfaceTypeSymbol,
-                                                 string factoryName)
+        private void RemoveObsoleteFactoriesFromSolution(string[] existingGeneratedFactoryFilePaths,
+                                                         string[] newGeneratedFactoryFilePaths)
+        {
+            var obsoleteFactoryFilePaths = existingGeneratedFactoryFilePaths.Where(existingFactory => !newGeneratedFactoryFilePaths.Contains(existingFactory)).ToArray();
+            var newSolution = this.solution;
+
+            foreach (var obsoleteFactoryFilePath in obsoleteFactoryFilePaths)
+            {
+                var obsoleteFactoryDocument = FindDocumentFromPath(newSolution, obsoleteFactoryFilePath);
+                var newProject = obsoleteFactoryDocument.Project.RemoveDocument(obsoleteFactoryDocument.Id);
+
+                File.Delete(obsoleteFactoryFilePath);
+
+                newSolution = newProject.Solution;
+            }
+
+            Interlocked.Exchange(ref this.solution, newSolution);
+        }
+
+        private string RenderFactoryImplementation(ClassDeclarationSyntax concreteClassDeclarationSyntax,
+                                                   INamedTypeSymbol concreteClassTypeSymbol,
+                                                   INamedTypeSymbol factoryInterfaceTypeSymbol,
+                                                   string factoryName)
         {
             var fileName = string.Format("{0}.Generated.cs", factoryName);
 
-            var usingsToFilterOut = new[] { "T4Factories", concreteClassTypeSymbol.ContainingNamespace.ToString() };
+            var usingsToFilterOut = new[] { concreteClassTypeSymbol.ContainingNamespace.ToString() };
             var outerUsingDeclarations = FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<CompilationUnitSyntax>().Usings, usingsToFilterOut);
             var innerUsingDeclarations = FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<NamespaceDeclarationSyntax>().Usings, usingsToFilterOut);
 
@@ -503,13 +591,15 @@
             if (existingDocument != null)
             {
                 UpdateDocument(existingDocument, code);
-            }
-            else
-            {
-                var newDocument = project.AddDocument(fileName, code, typeDeclarationDocument.Folders);
 
-                this.solution = newDocument.Project.Solution;
+                return existingDocument.FilePath;
             }
+
+            var newDocument = project.AddDocument(fileName, code, typeDeclarationDocument.Folders);
+
+            this.solution = newDocument.Project.Solution;
+
+            return newDocument.FilePath;
         }
 
         #endregion
