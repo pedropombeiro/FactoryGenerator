@@ -3,13 +3,13 @@
     using System;
     using System.Collections.Generic;
     using System.Diagnostics;
+    using System.IO;
     using System.Linq;
     using System.Text;
     using System.Threading.Tasks;
 
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
-    using Microsoft.CodeAnalysis.Text;
 
     public class FactoryGenerator
     {
@@ -199,6 +199,26 @@
                                                                                              .All(c.Parameters.Select(cp => cp.Name).Contains));
 
             return selectedConstructor;
+        }
+
+        private static void UpdateDocument(Document document,
+                                           string newText)
+        {
+            string originalText;
+            Encoding originalEncoding;
+
+            // Small hack to force files to be saved without changing encoding (Roslyn is currently saving files in Windows 1252 codepage).
+            using (var streamReader = new StreamReader(document.FilePath, Encoding.Default))
+            {
+                originalText = streamReader.ReadToEnd();
+
+                originalEncoding = streamReader.CurrentEncoding;
+            }
+
+            if (!newText.Equals(originalText))
+            {
+                File.WriteAllText(document.FilePath, newText, originalEncoding);
+            }
         }
 
         private string BuildFactoryImplementationConstructorsCodeSection(string factoryImplementationTypeName,
@@ -482,7 +502,7 @@
 
             if (existingDocument != null)
             {
-                this.UpdateDocument(existingDocument, SourceText.From(code));
+                UpdateDocument(existingDocument, code);
             }
             else
             {
@@ -490,14 +510,6 @@
 
                 this.solution = newDocument.Project.Solution;
             }
-        }
-
-        private void UpdateDocument(Document document,
-                                    SourceText newText)
-        {
-            var oldSolution = this.solution;
-            var newSolution = oldSolution.WithDocumentText(document.Id, newText);
-            this.solution = newSolution;
         }
 
         #endregion
