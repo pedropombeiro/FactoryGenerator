@@ -182,7 +182,7 @@
         private static IMethodSymbol SelectConstructorFromFactoryMethod(IMethodSymbol factoryMethod,
                                                                         INamedTypeSymbol concreteClassSymbol)
         {
-            if (!concreteClassSymbol.AllInterfaces.Contains(factoryMethod.ReturnType))
+            if (!concreteClassSymbol.AllInterfaces.Select(i => i.OriginalDefinition).Contains(factoryMethod.ReturnType.OriginalDefinition))
             {
                 var message = string.Format("The factory method does not return the correct type (i.e. a type inherited by {0}). Are you sure the attribute maps to the correct factory type? Currently it maps to {1}.",
                                             concreteClassSymbol,
