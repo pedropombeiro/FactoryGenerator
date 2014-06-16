@@ -220,31 +220,15 @@
         }
 
         private static IMethodSymbol SelectConstructorFromFactoryMethod(IMethodSymbol factoryMethod,
-                                                                        INamedTypeSymbol concreteClassSymbol,
-                                                                        IParameterSymbol[] injectedParameters)
+                                                                        INamedTypeSymbol concreteClassSymbol)
         {
-            IMethodSymbol selectedConstructor;
-            var factoryMethodParameterCount = factoryMethod.Parameters.Length;
-            var instanceConstructors = concreteClassSymbol.InstanceConstructors;
+            var factoryMethodParameters = factoryMethod.Parameters;
+            var instanceConstructors = concreteClassSymbol.InstanceConstructors
+                                                          .Where(c => c.DeclaredAccessibility == Accessibility.Public);
 
-            if (factoryMethodParameterCount == 0)
-            {
-                selectedConstructor = instanceConstructors.OrderBy(c => c.Parameters.Length)
-                                                          .First(c => !c.Parameters.Select(cp => cp.Name)
-                                                                        .Except(injectedParameters.Select(fmp => fmp.Name)).Any());
-            }
-            else
-            {
-                selectedConstructor = instanceConstructors.OrderByDescending(c => c.Parameters.Length)
-                                                          .First(c =>
-                                                                 {
-                                                                     var parametersInCommon = c.Parameters.Select(cp => cp.Name)
-                                                                                               .Intersect(factoryMethod.Parameters.Select(fmp => fmp.Name))
-                                                                                               .Count();
-
-                                                                     return parametersInCommon == factoryMethodParameterCount;
-                                                                 });
-            }
+            var selectedConstructor = instanceConstructors.OrderBy(c => c.Parameters.Length)
+                                                          .First(c => factoryMethodParameters.Select(fmp => fmp.Name)
+                                                                       .All(c.Parameters.Select(cp => cp.Name).Contains));
 
             return selectedConstructor;
         }
@@ -266,7 +250,7 @@
 
                 foreach (var factoryMethod in factoryMethods)
                 {
-                    var selectedConstructor = SelectConstructorFromFactoryMethod(factoryMethod, concreteClassSymbol, injectedParameters);
+                    var selectedConstructor = SelectConstructorFromFactoryMethod(factoryMethod, concreteClassSymbol);
                     var factoryMethodParameters = factoryMethod.Parameters;
                     var parameterListAsText = factoryMethodParameters.Select(p =>
                                                                              {
@@ -366,7 +350,16 @@
         private void GenerateFactoryForClass(ClassDeclarationSyntax concreteClassDeclarationSyntax,
                                              INamedTypeSymbol concreteClassTypeSymbol)
         {
-            var factoryAttribute = concreteClassTypeSymbol.GetAttributes().Single(a => a.AttributeClass.ToString() == "T4Factories.GenerateT4FactoryAttribute");
+            var factoryAttribute = concreteClassTypeSymbol.GetAttributes().Single(a =>
+                                                                                  {
+                                                                                      var attributeClassFullName = a.AttributeClass.ToString();
+                                                                                      return attributeClassFullName == "T4Factories.GenerateT4FactoryAttribute" ||
+                                                                                             attributeClassFullName == "T4Factories.GenerateT4Factory";
+                                                                                  });
+            if (factoryAttribute.AttributeClass.Kind == SymbolKind.ErrorType)
+            {
+                throw new InvalidOperationException(string.Format("Cannot find the factory type for class {0} because of a compilation error.", GetDeclarationFullName(concreteClassDeclarationSyntax)));
+            }
 
             INamedTypeSymbol factoryInterfaceTypeSymbol;
             if (factoryAttribute.ConstructorArguments != null && factoryAttribute.ConstructorArguments.Any())
@@ -381,7 +374,7 @@
             }
             else
             {
-                throw new InvalidOperationException("Factory type must be specified in GenerateT4FactoryAttribute.");
+                throw new InvalidOperationException(string.Format("Factory type must be specified in GenerateT4FactoryAttribute on {0}.", GetDeclarationFullName(concreteClassDeclarationSyntax)));
             }
 
             var factoryClassGenericName = GetFactoryClassGenericName(concreteClassDeclarationSyntax);
@@ -420,10 +413,9 @@
                 }
             }
 
-            var allConstructorParameters = concreteClassTypeSymbol.Constructors
-                                                                  .Where(c => c.DeclaredAccessibility == Accessibility.Public)
-                                                                  .SelectMany(constructor => constructor.Parameters)
-                                                                  .ToArray();
+            var allConstructorParameters = contractTypeMethods.Select(factoryMethod => SelectConstructorFromFactoryMethod(factoryMethod, concreteClassTypeSymbol))
+                                                              .SelectMany(selectedConstructor => selectedConstructor.Parameters)
+                                                              .ToArray();
             var injectedParameters = (from parameter in (IEnumerable<IParameterSymbol>)allConstructorParameters
                                       where !allContractMethodParameters.Any(contractMethodParameter => CompareParameters(contractMethodParameter, parameter))
                                       select parameter).ToArray();
