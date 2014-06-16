@@ -6,7 +6,7 @@
     {
         #region Public Properties
 
-        [Option('a', "attribute-import-list", Required = false, HelpText = "Attributes to import")]
+        [Option('a', "attribute-import-list", Required = false, HelpText = "Attributes to import", DefaultValue = "")]
         public string AttributeImportList { get; set; }
 
         [Option("teamcity-output", Required = false, HelpText = "Enable TeamCity output", DefaultValue = false)]

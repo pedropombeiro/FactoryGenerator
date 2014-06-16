@@ -77,7 +77,7 @@
                 if (commandLineOptions.PauseOnError)
                 {
                     Logger.Info("Press any key to exit.");
-                    Console.Read();
+                    Console.ReadKey();
                 }
 
                 Environment.Exit(innerException.HResult);

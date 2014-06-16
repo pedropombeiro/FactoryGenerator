@@ -11,6 +11,8 @@
 
     using Common.Logging;
 
+    using Humanizer;
+
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -59,8 +61,9 @@
             chrono.Start();
 
             var projectDependencyGraph = await this.solution.GetProjectDependencyGraphAsync();
-            var existingFactoriesTasksList = new List<Task<ICollection<string>>>(16);
-            var newFactoriesTasksList = new List<Task<ICollection<string>>>(16);
+            var projectCount = this.solution.Projects.Count();
+            var existingFactoriesTasksList = new List<Task<ICollection<string>>>(projectCount);
+            var newFactoriesTasksList = new List<Task<ICollection<string>>>(projectCount);
             foreach (var projectId in projectDependencyGraph.GetTopologicallySortedProjects())
             {
                 var project = this.solution.GetProject(projectId);
@@ -187,12 +190,11 @@
             var typeParameterCount = typeDeclarationSyntax.TypeParameterList == null
                                          ? 0
                                          : typeDeclarationSyntax.TypeParameterList.Parameters.Count;
-            var fullyQualifiedName = string.Format("{0}.{1}{2}",
-                                                   GetDeclarationNamespaceFullName(typeDeclarationSyntax),
-                                                   typeDeclarationSyntax.Identifier.ValueText,
-                                                   typeParameterCount == 0
-                                                       ? string.Empty
-                                                       : string.Format("`{0}", typeParameterCount));
+            var fullyQualifiedName = "{0}.{1}{2}".FormatWith(GetDeclarationNamespaceFullName(typeDeclarationSyntax),
+                                                             typeDeclarationSyntax.Identifier.ValueText,
+                                                             typeParameterCount == 0
+                                                                 ? string.Empty
+                                                                 : "`{0}".FormatWith(typeParameterCount));
 
             return fullyQualifiedName;
         }
@@ -214,7 +216,7 @@
 
         private static string GetFactoryClassGenericName(ClassDeclarationSyntax concreteTypeDeclarationSyntax)
         {
-            var factoryClassName = string.Format("{0}Factory{1}", concreteTypeDeclarationSyntax.Identifier.ValueText, concreteTypeDeclarationSyntax.TypeParameterList);
+            var factoryClassName = "{0}Factory{1}".FormatWith(concreteTypeDeclarationSyntax.Identifier.ValueText, concreteTypeDeclarationSyntax.TypeParameterList);
 
             return factoryClassName;
         }
@@ -223,15 +225,14 @@
                                                           IEnumerable<IParameterSymbol> injectedParameters)
         {
             var parametersRepresentation = constructor.Parameters.Select(parameter =>
-                                                                         string.Format("{0}{1}{2}",
-                                                                                       injectedParameters.Select(p => p.Name).Contains(parameter.Name)
-                                                                                           ? "this."
-                                                                                           : string.Empty,
-                                                                                       string.Empty /*GetParameterModifiers(parameter)*/,
-                                                                                       parameter.Name));
+                                                                         "{0}{1}{2}".FormatWith(injectedParameters.Select(p => p.Name).Contains(parameter.Name)
+                                                                                                    ? "this."
+                                                                                                    : string.Empty,
+                                                                                                string.Empty /*GetParameterModifiers(parameter)*/,
+                                                                                                parameter.Name));
             if (constructor.Parameters.Length > 1)
             {
-                return string.Format("\r\n                {0}", string.Join(", \r\n                ", parametersRepresentation));
+                return "\r\n                {0}".FormatWith(string.Join(", \r\n                ", parametersRepresentation));
             }
 
             return string.Join(", ", parametersRepresentation);
@@ -269,9 +270,8 @@
         {
             if (!concreteClassSymbol.AllInterfaces.Select(i => i.OriginalDefinition).Contains(factoryMethod.ReturnType.OriginalDefinition))
             {
-                var message = string.Format("The factory method does not return the correct type (i.e. a type inherited by {0}). Are you sure the attribute maps to the correct factory type? Currently it maps to {1}.",
-                                            concreteClassSymbol,
-                                            factoryMethod.ContainingType);
+                var message = "The factory method does not return the correct type (i.e. a type inherited by {0}). Are you sure the attribute maps to the correct factory type? Currently it maps to {1}."
+                    .FormatWith(concreteClassSymbol, factoryMethod.ContainingType);
                 throw new InvalidOperationException(message);
             }
 
@@ -331,7 +331,7 @@
 
             if (importedConstructorAttributes.Any())
             {
-                factoryConstructorsStringBuilder.AppendLine(string.Format("        [{0}]", string.Join(", ", importedConstructorAttributes.Select(cs => cs.ToString()))));
+                factoryConstructorsStringBuilder.AppendLine("        [{0}]".FormatWith(string.Join(", ", importedConstructorAttributes.Select(cs => cs.ToString()))));
             }
 
             if (injectedParameters.Count == 1)
@@ -351,7 +351,7 @@
         {{
             {0}
         }}",
-                                                          string.Join("\r\n            ", injectedParameters.Select(p => string.Format("this.{0} = {0};", p.Name))));
+                                                          string.Join("\r\n            ", injectedParameters.Select(p => "this.{0} = {0};".FormatWith(p.Name))));
             factoryConstructorsStringBuilder.AppendLine();
             factoryConstructorsStringBuilder.AppendLine();
 
@@ -384,10 +384,10 @@
                                                                              {
                                                                                  var attributes = p.GetAttributes();
                                                                                  var attributeSection = attributes.Any()
-                                                                                                            ? string.Format("[{0}] ", string.Join(", ", attributes.Select(a => a.ToString())))
+                                                                                                            ? "[{0}] ".FormatWith(string.Join(", ", attributes.Select(a => a.ToString())))
                                                                                                             : string.Empty;
 
-                                                                                 return string.Format("{0}{1} {2}", attributeSection, p.Type, p.Name);
+                                                                                 return "{0}{1} {2}".FormatWith(attributeSection, p.Type, p.Name);
                                                                              });
 
                     if (this.writeXmlDoc)
@@ -400,7 +400,7 @@
                                                                        .TakeWhile(line => line != "</member>")
                                                                        .ToArray();
                             var indent = relevantLines.First().Length - relevantLines.First().TrimStart().Length;
-                            var relevantLinesAsXmlDoc = relevantLines.Select(line => string.Format("        /// {0}", line.Substring(indent)));
+                            var relevantLinesAsXmlDoc = relevantLines.Select(line => "        /// {0}".FormatWith(line.Substring(indent)));
 
                             factoryMethodsStringBuilder.AppendLine(string.Join("\r\n", relevantLinesAsXmlDoc));
                         }
@@ -491,7 +491,7 @@
             }
             else
             {
-                throw new InvalidOperationException(string.Format("Factory type must be specified in {0} on {1}.", factoryAttribute.AttributeClass, GetDeclarationFullName(concreteClassDeclarationSyntax)));
+                throw new InvalidOperationException("Factory type must be specified in {0} on {1}.".FormatWith(factoryAttribute.AttributeClass, GetDeclarationFullName(concreteClassDeclarationSyntax)));
             }
 
             var factoryClassGenericName = GetFactoryClassGenericName(concreteClassDeclarationSyntax);
@@ -510,11 +510,14 @@
             var obsoleteFactoryFilePaths = existingGeneratedFactoryFilePaths.Where(existingFactory => !newGeneratedFactoryFilePaths.Contains(existingFactory)).ToArray();
             var newSolution = this.solution;
 
+            Logger.InfoFormat("Removing {0} from solution...", "obsolete generated factory file".ToQuantity(obsoleteFactoryFilePaths.Length));
+
             foreach (var obsoleteFactoryFilePath in obsoleteFactoryFilePaths)
             {
                 var obsoleteFactoryDocument = FindDocumentFromPath(newSolution, obsoleteFactoryFilePath);
                 var newProject = obsoleteFactoryDocument.Project.RemoveDocument(obsoleteFactoryDocument.Id);
 
+                Logger.InfoFormat("{0} from {1}.", Path.GetFileName(obsoleteFactoryFilePath), newProject.Name);
                 File.Delete(obsoleteFactoryFilePath);
 
                 newSolution = newProject.Solution;
@@ -528,7 +531,7 @@
                                                    INamedTypeSymbol factoryInterfaceTypeSymbol,
                                                    string factoryName)
         {
-            var fileName = string.Format("{0}.Generated.cs", factoryName);
+            var fileName = "{0}.Generated.cs".FormatWith(factoryName);
 
             var usingsToFilterOut = new[] { concreteClassTypeSymbol.ContainingNamespace.ToString() };
             var outerUsingDeclarations = FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<CompilationUnitSyntax>().Usings, usingsToFilterOut);
@@ -578,10 +581,10 @@
 }"
                 .Replace("<#=namespaceFullName#>", GetDeclarationNamespaceFullName(concreteClassDeclarationSyntax))
                 .Replace("<#=outerUsings#>", outerUsingDeclarations.Any()
-                                                 ? string.Format("{0}\r\n", innerUsingDeclarations.ToFullString())
+                                                 ? "{0}\r\n".FormatWith(innerUsingDeclarations.ToFullString())
                                                  : string.Empty)
                 .Replace("<#=innerUsings#>", innerUsingDeclarations.Any()
-                                                 ? string.Format("\r\n{0}", innerUsingDeclarations.ToFullString())
+                                                 ? "\r\n{0}".FormatWith(innerUsingDeclarations.ToFullString())
                                                  : string.Empty)
                 .Replace("<#=factoryTypeName#>", GetFactoryClassGenericName(concreteClassDeclarationSyntax))
                 .Replace("<#=factoryContractTypeFullName#>", factoryInterfaceTypeSymbol.ToString())
