@@ -15,6 +15,8 @@
     {
         #region Fields
 
+        private readonly string[] attributeImportList;
+
         private readonly Workspace workspace;
 
         private readonly bool writeXmlDoc;
@@ -28,10 +30,12 @@
         [DebuggerStepThrough]
         public FactoryGenerator(Workspace workspace,
                                 Solution solution,
+                                string[] attributeImportList,
                                 bool writeXmlDoc)
         {
             this.workspace = workspace;
             this.solution = solution;
+            this.attributeImportList = attributeImportList;
             this.writeXmlDoc = writeXmlDoc;
         }
 
@@ -69,55 +73,6 @@
         #endregion
 
         #region Methods
-
-        private static string BuildFactoryImplementationConstructorsCodeSection(string factoryImplementationTypeName,
-                                                                                ClassDeclarationSyntax concreteClassDeclarationSyntax,
-                                                                                ICollection<IParameterSymbol> injectedParameters)
-        {
-            if (injectedParameters.Count == 0)
-            {
-                return string.Empty;
-            }
-
-            var factoryConstructorsStringBuilder = new StringBuilder();
-            var allConstructorAttributes = concreteClassDeclarationSyntax.Members.OfType<ConstructorDeclarationSyntax>()
-                                                                         .SelectMany(cs => cs.AttributeLists.SelectMany(al => al.Attributes))
-                                                                         .ToArray();
-
-            factoryConstructorsStringBuilder.AppendLine("        #region Constructors");
-            factoryConstructorsStringBuilder.AppendLine();
-
-            if (allConstructorAttributes.Any())
-            {
-                factoryConstructorsStringBuilder.AppendLine(string.Format("        [{0}]", string.Join(", ", allConstructorAttributes.Select(cs => cs.ToString()))));
-            }
-
-            if (injectedParameters.Count == 1)
-            {
-                factoryConstructorsStringBuilder.AppendFormat(@"        public {0}({1})",
-                                                              factoryImplementationTypeName,
-                                                              injectedParameters.Single().DeclaringSyntaxReferences[0].GetSyntax());
-            }
-            else
-            {
-                factoryConstructorsStringBuilder.AppendFormat(@"        public {0}(
-            {1})",
-                                                              factoryImplementationTypeName,
-                                                              string.Join(",\r\n            ", injectedParameters.Select(p => p.DeclaringSyntaxReferences[0].GetSyntax().ToString())));
-            }
-            factoryConstructorsStringBuilder.AppendFormat(@"
-        {{
-            {0}
-        }}",
-                                                          string.Join("\r\n            ", injectedParameters.Select(p => string.Format("this.{0} = {0};", p.Name))));
-            factoryConstructorsStringBuilder.AppendLine();
-            factoryConstructorsStringBuilder.AppendLine();
-
-            factoryConstructorsStringBuilder.AppendLine("        #endregion");
-            factoryConstructorsStringBuilder.AppendLine();
-
-            return factoryConstructorsStringBuilder.ToString();
-        }
 
         private static string BuildFactoryImplementationFieldsCodeSection(IParameterSymbol[] injectedParameters)
         {
@@ -236,6 +191,61 @@
                                                                                              .All(c.Parameters.Select(cp => cp.Name).Contains));
 
             return selectedConstructor;
+        }
+
+        private string BuildFactoryImplementationConstructorsCodeSection(string factoryImplementationTypeName,
+                                                                         ClassDeclarationSyntax concreteClassDeclarationSyntax,
+                                                                         ICollection<IParameterSymbol> injectedParameters)
+        {
+            if (injectedParameters.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            var factoryConstructorsStringBuilder = new StringBuilder();
+            var allConstructorAttributes = concreteClassDeclarationSyntax.Members.OfType<ConstructorDeclarationSyntax>()
+                                                                         .SelectMany(cs => cs.AttributeLists.SelectMany(al => al.Attributes))
+                                                                         .ToArray();
+            var importedConstructorAttributes = allConstructorAttributes.Where(attributeSyntax =>
+                                                                               {
+                                                                                   var attributeName = attributeSyntax.Name.ToString();
+                                                                                   return this.attributeImportList.Any(attributeName.Contains);
+                                                                               })
+                                                                        .ToArray();
+
+            factoryConstructorsStringBuilder.AppendLine("        #region Constructors");
+            factoryConstructorsStringBuilder.AppendLine();
+
+            if (importedConstructorAttributes.Any())
+            {
+                factoryConstructorsStringBuilder.AppendLine(string.Format("        [{0}]", string.Join(", ", importedConstructorAttributes.Select(cs => cs.ToString()))));
+            }
+
+            if (injectedParameters.Count == 1)
+            {
+                factoryConstructorsStringBuilder.AppendFormat(@"        public {0}({1})",
+                                                              factoryImplementationTypeName,
+                                                              injectedParameters.Single().DeclaringSyntaxReferences[0].GetSyntax());
+            }
+            else
+            {
+                factoryConstructorsStringBuilder.AppendFormat(@"        public {0}(
+            {1})",
+                                                              factoryImplementationTypeName,
+                                                              string.Join(",\r\n            ", injectedParameters.Select(p => p.DeclaringSyntaxReferences[0].GetSyntax().ToString())));
+            }
+            factoryConstructorsStringBuilder.AppendFormat(@"
+        {{
+            {0}
+        }}",
+                                                          string.Join("\r\n            ", injectedParameters.Select(p => string.Format("this.{0} = {0};", p.Name))));
+            factoryConstructorsStringBuilder.AppendLine();
+            factoryConstructorsStringBuilder.AppendLine();
+
+            factoryConstructorsStringBuilder.AppendLine("        #endregion");
+            factoryConstructorsStringBuilder.AppendLine();
+
+            return factoryConstructorsStringBuilder.ToString();
         }
 
         private string BuildFactoryImplementationMethodsCodeSection(INamedTypeSymbol concreteClassSymbol,
@@ -426,7 +436,7 @@
                                       select parameter).ToArray();
 
             var factoryFieldsCodeSection = BuildFactoryImplementationFieldsCodeSection(injectedParameters);
-            var factoryConstructorsCodeSection = BuildFactoryImplementationConstructorsCodeSection(factoryName, concreteClassDeclarationSyntax, injectedParameters);
+            var factoryConstructorsCodeSection = this.BuildFactoryImplementationConstructorsCodeSection(factoryName, concreteClassDeclarationSyntax, injectedParameters);
             var factoryMethodsCodeSection = this.BuildFactoryImplementationMethodsCodeSection(concreteClassTypeSymbol, factoryInterfaceTypeSymbol, injectedParameters);
 
             var code = @"#pragma warning disable 1591

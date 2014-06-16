@@ -15,6 +15,9 @@
         [Option('p', "pause", Required = false, HelpText = "Pause on error", DefaultValue = true)]
         public bool PauseOnError { get; set; }
 
+        [Option('a', "attribute-import-list", Required = false, HelpText = "Attributes to import")]
+        public string AttributeImportList { get; set; }
+
         #endregion
     }
 }

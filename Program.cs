@@ -10,6 +10,7 @@
         #region Methods
 
         private static async Task GenerateFactoriesAsync(string solutionPath,
+                                                         string[] attributeImportList,
                                                          bool writeXmlDoc)
         {
             var workspace = MSBuildWorkspace.Create();
@@ -21,7 +22,7 @@
                 Console.WriteLine(project.Name);
             }
 
-            var factoryGenerator = new FactoryGenerator(workspace, solution, writeXmlDoc);
+            var factoryGenerator = new FactoryGenerator(workspace, solution, attributeImportList, writeXmlDoc);
 
             await factoryGenerator.ExecuteAsync();
         }
@@ -36,7 +37,7 @@
 
             try
             {
-                GenerateFactoriesAsync(commandLineOptions.SolutionPath, commandLineOptions.WriteXmlDoc).Wait();
+                GenerateFactoriesAsync(commandLineOptions.SolutionPath, commandLineOptions.AttributeImportList.Split(new []{ ',', ';' }, StringSplitOptions.RemoveEmptyEntries), commandLineOptions.WriteXmlDoc).Wait();
             }
             catch (AggregateException e)
             {
