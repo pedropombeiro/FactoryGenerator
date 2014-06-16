@@ -67,7 +67,7 @@
 
             try
             {
-                GenerateFactoriesAsync(commandLineOptions.SolutionPath, commandLineOptions.AttributeImportList.Split(new []{ ',', ';' }, StringSplitOptions.RemoveEmptyEntries), commandLineOptions.WriteXmlDoc).Wait();
+                GenerateFactoriesAsync(commandLineOptions.SolutionPath, commandLineOptions.AttributeImportList.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries), commandLineOptions.WriteXmlDoc).Wait();
             }
             catch (AggregateException e)
             {
