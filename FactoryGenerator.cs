@@ -184,7 +184,7 @@
 
         private static string GetFactoryClassGenericName(ClassDeclarationSyntax concreteTypeDeclarationSyntax)
         {
-            var factoryClassName = string.Format("{0}Factory{1}", concreteTypeDeclarationSyntax.Identifier.ValueText, string.Empty /*GetGenericArguments(concreteTypeDeclarationSyntax)*/);
+            var factoryClassName = string.Format("{0}Factory{1}", concreteTypeDeclarationSyntax.Identifier.ValueText, concreteTypeDeclarationSyntax.TypeParameterList);
 
             return factoryClassName;
         }
@@ -256,7 +256,7 @@
             var factoryMethodsStringBuilder = new StringBuilder();
             var factoryMethods = factoryInterfaceSymbol.GetMembers()
                                                        .OfType<IMethodSymbol>()
-                                                       .Where(methodSymbol => concreteClassSymbol.AllInterfaces.Contains(methodSymbol.ReturnType))
+                                                       .Where(methodSymbol => concreteClassSymbol.AllInterfaces.Select(i => i.OriginalDefinition).Contains(methodSymbol.ReturnType.OriginalDefinition))
                                                        .ToArray();
 
             if (factoryMethods.Any())
@@ -373,6 +373,11 @@
             {
                 var typeOfArgument = factoryAttribute.ConstructorArguments.Single();
                 factoryInterfaceTypeSymbol = (INamedTypeSymbol)typeOfArgument.Value;
+
+                if (factoryInterfaceTypeSymbol.IsUnboundGenericType)
+                {
+                    factoryInterfaceTypeSymbol = factoryInterfaceTypeSymbol.ConstructedFrom;
+                }
             }
             else
             {
@@ -398,10 +403,6 @@
             var outerUsingDeclarations = FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<CompilationUnitSyntax>().Usings, usingsToFilterOut);
             var innerUsingDeclarations = FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<NamespaceDeclarationSyntax>().Usings, usingsToFilterOut);
 
-            var allConstructorParameters = concreteClassTypeSymbol.Constructors
-                                                                  .Where(c => c.DeclaredAccessibility == Accessibility.Public)
-                                                                  .SelectMany(constructor => constructor.Parameters)
-                                                                  .ToArray();
             var contractTypeMethods = factoryInterfaceTypeSymbol.GetMembers().OfType<IMethodSymbol>().ToArray();
             var allContractMethodParameters = contractTypeMethods.SelectMany(contractTypeMethod => contractTypeMethod.Parameters).ToArray();
             if (!contractTypeMethods.Any())
@@ -419,6 +420,10 @@
                 }
             }
 
+            var allConstructorParameters = concreteClassTypeSymbol.Constructors
+                                                                  .Where(c => c.DeclaredAccessibility == Accessibility.Public)
+                                                                  .SelectMany(constructor => constructor.Parameters)
+                                                                  .ToArray();
             var injectedParameters = (from parameter in (IEnumerable<IParameterSymbol>)allConstructorParameters
                                       where !allContractMethodParameters.Any(contractMethodParameter => CompareParameters(contractMethodParameter, parameter))
                                       select parameter).ToArray();
@@ -451,7 +456,7 @@
                 .Replace("<#=factoryTypeName#>", GetFactoryClassGenericName(concreteClassDeclarationSyntax))
                 .Replace("<#=factoryContractTypeFullName#>", factoryInterfaceTypeSymbol.ToString())
                 .Replace("<#=GeneratedCodeAttribute#>", "global::System.CodeDom.Compiler.GeneratedCode(\"AutoGenFactories\", \"0.1\")")
-                .Replace("<#=concreteXmlDocSafeTypeName#>", GetXmlDocSafeTypeName(GetDeclarationFullName(concreteClassDeclarationSyntax)))
+                .Replace("<#=concreteXmlDocSafeTypeName#>", GetXmlDocSafeTypeName(concreteClassTypeSymbol.ToString()))
                 .Replace("<#=factoryFields#>", factoryFieldsCodeSection)
                 .Replace("<#=factoryConstructors#>", factoryConstructorsCodeSection)
                 .Replace("<#=factoryMethods#>", factoryMethodsCodeSection);
