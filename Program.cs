@@ -41,25 +41,36 @@
 
             var loggingConfiguration = NLog.LogManager.Configuration;
             var loggingRules = loggingConfiguration.LoggingRules;
+            var consoleTarget = loggingConfiguration.FindTargetByName("console");
 
             if (commandLineOptions.EnableTeamCityOutput)
             {
-                var teamCityLoggingRule = new LoggingRule("*", NLog.LogLevel.Info, loggingConfiguration.FindTargetByName("TeamCity"));
-                var consoleLoggingRule = new LoggingRule("*", loggingConfiguration.FindTargetByName("console"));
+                var teamCityProgressTarget = loggingConfiguration.FindTargetByName("TeamCity_progress");
+                var teamCityErrorTarget = loggingConfiguration.FindTargetByName("TeamCity_error");
+                var teamCityProgressLoggingRule = new LoggingRule("*", teamCityProgressTarget);
+                var teamCityErrorLoggingRule = new LoggingRule("*", NLog.LogLevel.Error, teamCityErrorTarget);
+                var consoleLoggingRule = new LoggingRule("*", consoleTarget);
 
                 consoleLoggingRule.EnableLoggingForLevel(NLog.LogLevel.Debug);
+                teamCityProgressLoggingRule.EnableLoggingForLevel(NLog.LogLevel.Info);
+                teamCityProgressLoggingRule.EnableLoggingForLevel(NLog.LogLevel.Warn);
 
-                loggingRules.Add(teamCityLoggingRule);
                 loggingRules.Add(consoleLoggingRule);
+                loggingRules.Add(teamCityProgressLoggingRule);
+                loggingRules.Add(teamCityErrorLoggingRule);
             }
             else
             {
-                loggingRules.Add(new LoggingRule("*", NLog.LogLevel.Debug, loggingConfiguration.FindTargetByName("console")));
+                var loggingRule = new LoggingRule("*", NLog.LogLevel.Debug, consoleTarget);
+                loggingRules.Add(loggingRule);
             }
 
             try
             {
-                GenerateFactoriesAsync(commandLineOptions.SolutionPath, commandLineOptions.AttributeImportList.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries), commandLineOptions.WriteXmlDoc).Wait();
+                GenerateFactoriesAsync(commandLineOptions.SolutionPath,
+                                       commandLineOptions.AttributeImportList.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries),
+                                       commandLineOptions.WriteXmlDoc)
+                    .Wait();
             }
             catch (AggregateException e)
             {
