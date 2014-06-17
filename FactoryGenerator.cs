@@ -5,6 +5,7 @@
     using System.Diagnostics;
     using System.IO;
     using System.Linq;
+    using System.Reflection;
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
@@ -33,6 +34,8 @@
         private readonly bool writeXmlDoc;
 
         private Solution solution;
+
+        private string version = FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).ProductVersion;
 
         #endregion
 
@@ -604,7 +607,7 @@
                                                  : string.Empty)
                 .Replace("<#=factoryTypeName#>", GetFactoryClassGenericName(concreteClassDeclarationSyntax))
                 .Replace("<#=factoryContractTypeFullName#>", factoryInterfaceTypeSymbol.ToString())
-                .Replace("<#=GeneratedCodeAttribute#>", "global::System.CodeDom.Compiler.GeneratedCode(\"DeveloperInTheFlow.FactoryGenerator\", \"0.1\")")
+                .Replace("<#=GeneratedCodeAttribute#>", string.Format("global::System.CodeDom.Compiler.GeneratedCode(\"DeveloperInTheFlow.FactoryGenerator\", \"{0}\")", version))
                 .Replace("<#=concreteXmlDocSafeTypeName#>", GetXmlDocSafeTypeName(concreteClassTypeSymbol.ToString()))
                 .Replace("<#=factoryFields#>", factoryFieldsCodeSection)
                 .Replace("<#=factoryConstructors#>", factoryConstructorsCodeSection)
