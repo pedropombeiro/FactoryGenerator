@@ -5,11 +5,11 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 
-[assembly: AssemblyTitle("AutoGenFactories")]
+[assembly: AssemblyTitle("FactoryGenerator")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("AutoGenFactories")]
+[assembly: AssemblyProduct("FactoryGenerator")]
 [assembly: AssemblyCopyright("Copyright Â© Pedro Pombeiro 2014")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]

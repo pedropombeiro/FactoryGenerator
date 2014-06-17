@@ -1,4 +1,4 @@
-﻿namespace DeveloperInTheFlow.AutoGenFactories
+﻿namespace DeveloperInTheFlow.FactoryGenerator
 {
     using System;
     using System.Collections.Generic;
@@ -604,7 +604,7 @@
                                                  : string.Empty)
                 .Replace("<#=factoryTypeName#>", GetFactoryClassGenericName(concreteClassDeclarationSyntax))
                 .Replace("<#=factoryContractTypeFullName#>", factoryInterfaceTypeSymbol.ToString())
-                .Replace("<#=GeneratedCodeAttribute#>", "global::System.CodeDom.Compiler.GeneratedCode(\"AutoGenFactories\", \"0.1\")")
+                .Replace("<#=GeneratedCodeAttribute#>", "global::System.CodeDom.Compiler.GeneratedCode(\"DeveloperInTheFlow.FactoryGenerator\", \"0.1\")")
                 .Replace("<#=concreteXmlDocSafeTypeName#>", GetXmlDocSafeTypeName(concreteClassTypeSymbol.ToString()))
                 .Replace("<#=factoryFields#>", factoryFieldsCodeSection)
                 .Replace("<#=factoryConstructors#>", factoryConstructorsCodeSection)

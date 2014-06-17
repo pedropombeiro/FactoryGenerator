@@ -1,4 +1,4 @@
-﻿namespace DeveloperInTheFlow.AutoGenFactories
+﻿namespace DeveloperInTheFlow.FactoryGenerator
 {
     using CommandLine;
 

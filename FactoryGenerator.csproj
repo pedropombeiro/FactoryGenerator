@@ -8,8 +8,8 @@
     <ProjectGuid>{895E6D69-C407-4E3B-8866-57E3C00F49F2}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DeveloperInTheFlow.AutoGenFactories</RootNamespace>
-    <AssemblyName>AutoGenFactories</AssemblyName>
+    <RootNamespace>DeveloperInTheFlow.FactoryGenerator</RootNamespace>
+    <AssemblyName>FactoryGenerator</AssemblyName>
     <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
