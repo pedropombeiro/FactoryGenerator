@@ -67,12 +67,15 @@
             foreach (var projectId in projectDependencyGraph.GetTopologicallySortedProjects())
             {
                 var project = this.solution.GetProject(projectId);
-                var compilation = await project.GetCompilationAsync();
+                var compilation = await project.GetCompilationAsync().ConfigureAwait(false);
+
+                Logger.InfoFormat("Processing {0}...", project.Name);
 
                 var catalogTask = CatalogGeneratedFactoriesInProjectAsync(compilation);
+                var generateFactoriesTask = this.GenerateFactoriesInProjectAsync(compilation);
 
                 existingFactoriesTasksList.Add(catalogTask);
-                newFactoriesTasksList.Add(this.GenerateFactoriesInProjectAsync(compilation));
+                newFactoriesTasksList.Add(generateFactoriesTask);
             }
 
             await Task.WhenAll(existingFactoriesTasksList.Cast<Task>().Concat(newFactoriesTasksList));
@@ -88,7 +91,7 @@
 
             var ellapsedTime = TimeSpan.FromMilliseconds(chrono.ElapsedMilliseconds);
 
-            Logger.DebugFormat("Completed in {0}", ellapsedTime);
+            Logger.InfoFormat("Completed in {0}", ellapsedTime);
         }
 
         #endregion

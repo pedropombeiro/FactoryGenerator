@@ -26,14 +26,6 @@
             var workspace = MSBuildWorkspace.Create();
             var solution = await workspace.OpenSolutionAsync(solutionPath);
 
-            if (Logger.IsTraceEnabled)
-            {
-                foreach (var project in solution.Projects)
-                {
-                    Logger.Trace(project.Name);
-                }
-            }
-
             var factoryGenerator = new FactoryGenerator(workspace, solution, attributeImportList, writeXmlDoc);
 
             await factoryGenerator.ExecuteAsync();
