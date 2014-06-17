@@ -1,6 +1,7 @@
 ﻿namespace DeveloperInTheFlow.FactoryGenerator
 {
     using CommandLine;
+    using CommandLine.Text;
 
     public class CommandLineOptions
     {
@@ -12,6 +13,9 @@
         [Option("teamcity-output", Required = false, HelpText = "Enable TeamCity output", DefaultValue = false)]
         public bool EnableTeamCityOutput { get; set; }
 
+        [ParserState]
+        public IParserState LastParserState { get; set; }
+
         [Option('p', "pause", Required = false, HelpText = "Pause on error", DefaultValue = true)]
         public bool PauseOnError { get; set; }
 
@@ -20,6 +24,17 @@
 
         [Option('d', "doc", Required = false, HelpText = "Import XML documentation into generated factories", DefaultValue = false)]
         public bool WriteXmlDoc { get; set; }
+
+        #endregion
+
+        #region Public Methods and Operators
+
+        [HelpOption]
+        public string GetUsage()
+        {
+            return HelpText.AutoBuild(this,
+                                      current => HelpText.DefaultParsingErrorsHandler(this, current));
+        }
 
         #endregion
     }
