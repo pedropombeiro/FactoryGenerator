@@ -292,20 +292,27 @@
         private static void UpdateDocument(Document document,
                                            string newText)
         {
-            string originalText;
-            Encoding originalEncoding;
-
             // Small hack to force files to be saved without changing encoding (Roslyn is currently saving files in Windows 1252 codepage).
-            using (var streamReader = new StreamReader(document.FilePath, Encoding.Default))
+            if (File.Exists(document.FilePath))
             {
-                originalText = streamReader.ReadToEnd();
+                string originalText;
+                Encoding originalEncoding;
 
-                originalEncoding = streamReader.CurrentEncoding;
+                using (var streamReader = new StreamReader(document.FilePath, Encoding.Default))
+                {
+                    originalText = streamReader.ReadToEnd();
+
+                    originalEncoding = streamReader.CurrentEncoding;
+                }
+
+                if (!newText.Equals(originalText))
+                {
+                    File.WriteAllText(document.FilePath, newText, originalEncoding);
+                }
             }
-
-            if (!newText.Equals(originalText))
+            else
             {
-                File.WriteAllText(document.FilePath, newText, originalEncoding);
+                File.WriteAllText(document.FilePath, newText, Encoding.UTF8);
             }
         }
 
@@ -511,6 +518,12 @@
                                                          string[] newGeneratedFactoryFilePaths)
         {
             var obsoleteFactoryFilePaths = existingGeneratedFactoryFilePaths.Where(existingFactory => !newGeneratedFactoryFilePaths.Contains(existingFactory)).ToArray();
+
+            if (obsoleteFactoryFilePaths.Length == 0)
+            {
+                return;
+            }
+
             var newSolution = this.solution;
 
             Logger.InfoFormat("Removing {0} from solution...", "obsolete generated factory file".ToQuantity(obsoleteFactoryFilePaths.Length));

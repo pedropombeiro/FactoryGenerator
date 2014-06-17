@@ -72,7 +72,7 @@
                     Console.ReadKey();
                 }
 
-                Environment.Exit(innerException.HResult);
+                Environment.ExitCode = innerException.HResult;
             }
         }
 
