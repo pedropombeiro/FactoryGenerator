@@ -16,9 +16,6 @@
         [ParserState]
         public IParserState LastParserState { get; set; }
 
-        [Option('p', "pause", Required = false, HelpText = "Pause on error", DefaultValue = true)]
-        public bool PauseOnError { get; set; }
-
         [Option('s', "solution", Required = true, HelpText = "The path to the solution file to process")]
         public string SolutionPath { get; set; }
 

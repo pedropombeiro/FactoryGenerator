@@ -77,12 +77,6 @@
                 var innerException = e.Flatten().InnerException;
                 Logger.Fatal(innerException.Message, e);
 
-                if (commandLineOptions.PauseOnError)
-                {
-                    Logger.Info("Press any key to exit.");
-                    Console.ReadKey();
-                }
-
                 Environment.ExitCode = innerException.HResult;
             }
         }
