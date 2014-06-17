@@ -60,7 +60,7 @@
 
             chrono.Start();
 
-            var projectDependencyGraph = await this.solution.GetProjectDependencyGraphAsync();
+            var projectDependencyGraph = this.solution.GetProjectDependencyGraph();
             var projectCount = this.solution.Projects.Count();
             var existingFactoriesTasksList = new List<Task<ICollection<string>>>(projectCount);
             var newFactoriesTasksList = new List<Task<ICollection<string>>>(projectCount);
