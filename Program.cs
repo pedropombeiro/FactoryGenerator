@@ -45,19 +45,19 @@
 
             if (commandLineOptions.EnableTeamCityOutput)
             {
-                var teamCityProgressTarget = loggingConfiguration.FindTargetByName("TeamCity_progress");
-                var teamCityErrorTarget = loggingConfiguration.FindTargetByName("TeamCity_error");
-                var teamCityProgressLoggingRule = new LoggingRule("*", teamCityProgressTarget);
-                var teamCityErrorLoggingRule = new LoggingRule("*", NLog.LogLevel.Error, teamCityErrorTarget);
+                var teamCityProgressMessageTarget = loggingConfiguration.FindTargetByName("TeamCity_progressMessage");
+                var teamCityBuildStatusTarget = loggingConfiguration.FindTargetByName("TeamCity_buildStatus");
+                var teamCityProgressMessageLoggingRule = new LoggingRule("*", teamCityProgressMessageTarget);
+                var teamCityBuildStatusLoggingRule = new LoggingRule("*", NLog.LogLevel.Error, teamCityBuildStatusTarget);
                 var consoleLoggingRule = new LoggingRule("*", consoleTarget);
 
                 consoleLoggingRule.EnableLoggingForLevel(NLog.LogLevel.Debug);
-                teamCityProgressLoggingRule.EnableLoggingForLevel(NLog.LogLevel.Info);
-                teamCityProgressLoggingRule.EnableLoggingForLevel(NLog.LogLevel.Warn);
+                teamCityProgressMessageLoggingRule.EnableLoggingForLevel(NLog.LogLevel.Info);
+                teamCityProgressMessageLoggingRule.EnableLoggingForLevel(NLog.LogLevel.Warn);
 
                 loggingRules.Add(consoleLoggingRule);
-                loggingRules.Add(teamCityProgressLoggingRule);
-                loggingRules.Add(teamCityErrorLoggingRule);
+                loggingRules.Add(teamCityProgressMessageLoggingRule);
+                loggingRules.Add(teamCityBuildStatusLoggingRule);
             }
             else
             {
@@ -78,6 +78,11 @@
                 Logger.Fatal(innerException.Message, e);
 
                 Environment.ExitCode = innerException.HResult;
+            }
+            finally
+            {
+                NLog.LogManager.Flush();
+                NLog.LogManager.Shutdown();
             }
         }
 
