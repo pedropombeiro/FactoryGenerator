@@ -94,7 +94,7 @@
 
             var ellapsedTime = TimeSpan.FromMilliseconds(chrono.ElapsedMilliseconds);
 
-            Logger.InfoFormat("Completed in {0}", ellapsedTime);
+            Logger.InfoFormat("Generated {0} in {1}.", "factory".ToQuantity(newGeneratedFactories.Length), ellapsedTime.Humanize(2));
         }
 
         #endregion
