@@ -1,6 +1,7 @@
 ﻿namespace DeveloperInTheFlow.FactoryGenerator
 {
     using System;
+    using System.Reflection;
     using System.Threading.Tasks;
 
     using Common.Logging;
@@ -13,7 +14,24 @@
     {
         #region Static Fields
 
-        private static readonly ILog Logger = LogManager.GetLogger<Program>();
+        private static readonly ILog Logger;
+
+        #endregion
+
+        #region Constructors and Destructors
+
+        static Program()
+        {
+            ConfigurationItemFactory.Default.RegisterItemsFromAssembly(Assembly.GetExecutingAssembly());
+
+            Logger = LogManager.GetLogger<Program>();
+        }
+
+        #endregion
+
+        #region Properties
+
+        internal static CommandLineOptions CommandLineOptions { get; private set; }
 
         #endregion
 
@@ -33,43 +51,17 @@
 
         private static void Main(string[] args)
         {
-            var commandLineOptions = new CommandLineOptions();
-            if (!CommandLine.Parser.Default.ParseArguments(args, commandLineOptions))
+            CommandLineOptions = new CommandLineOptions();
+            if (!CommandLine.Parser.Default.ParseArguments(args, CommandLineOptions))
             {
                 Environment.Exit(1);
             }
 
-            var loggingConfiguration = NLog.LogManager.Configuration;
-            var loggingRules = loggingConfiguration.LoggingRules;
-            var consoleTarget = loggingConfiguration.FindTargetByName("console");
-
-            if (commandLineOptions.EnableTeamCityOutput)
-            {
-                var teamCityProgressMessageTarget = loggingConfiguration.FindTargetByName("TeamCity_progressMessage");
-                var teamCityBuildStatusTarget = loggingConfiguration.FindTargetByName("TeamCity_buildStatus");
-                var teamCityProgressMessageLoggingRule = new LoggingRule("*", teamCityProgressMessageTarget);
-                var teamCityBuildStatusLoggingRule = new LoggingRule("*", NLog.LogLevel.Error, teamCityBuildStatusTarget);
-                var consoleLoggingRule = new LoggingRule("*", consoleTarget);
-
-                consoleLoggingRule.EnableLoggingForLevel(NLog.LogLevel.Debug);
-                teamCityProgressMessageLoggingRule.EnableLoggingForLevel(NLog.LogLevel.Info);
-                teamCityProgressMessageLoggingRule.EnableLoggingForLevel(NLog.LogLevel.Warn);
-
-                loggingRules.Add(consoleLoggingRule);
-                loggingRules.Add(teamCityProgressMessageLoggingRule);
-                loggingRules.Add(teamCityBuildStatusLoggingRule);
-            }
-            else
-            {
-                var loggingRule = new LoggingRule("*", NLog.LogLevel.Debug, consoleTarget);
-                loggingRules.Add(loggingRule);
-            }
-
             try
             {
-                GenerateFactoriesAsync(commandLineOptions.SolutionPath,
-                                       commandLineOptions.AttributeImportList.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries),
-                                       commandLineOptions.WriteXmlDoc)
+                GenerateFactoriesAsync(CommandLineOptions.SolutionPath,
+                                       CommandLineOptions.AttributeImportList.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries),
+                                       CommandLineOptions.WriteXmlDoc)
                     .Wait();
             }
             catch (AggregateException e)

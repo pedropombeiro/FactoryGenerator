@@ -83,6 +83,7 @@
   <ItemGroup>
     <Compile Include="CommandLineOptions.cs" />
     <Compile Include="FactoryGenerator.cs" />
+    <Compile Include="LoggingConditions.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
