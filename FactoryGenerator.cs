@@ -258,6 +258,17 @@
                        : identifier;
         }
 
+        private static IMethodSymbol[] GetSuitableFactoryInterfaceMethods(INamedTypeSymbol concreteClassTypeSymbol,
+                                                                          INamedTypeSymbol factoryInterfaceTypeSymbol)
+        {
+            return factoryInterfaceTypeSymbol
+                .AllInterfaces
+                .Add(factoryInterfaceTypeSymbol)
+                .SelectMany(i => i.GetMembers().OfType<IMethodSymbol>())
+                .Where(methodSymbol => concreteClassTypeSymbol.AllInterfaces.Select(i => i.OriginalDefinition).Contains(methodSymbol.ReturnType.OriginalDefinition))
+                .ToArray();
+        }
+
         private static string GetXmlDocSafeTypeName(string typeName)
         {
             return typeName.Replace("<", "{").Replace(">", "}");
@@ -381,6 +392,7 @@
                                                               factoryImplementationTypeName,
                                                               string.Join(",\r\n            ", injectedParameters.Select(p => p.DeclaringSyntaxReferences[0].GetSyntax().ToString())));
             }
+
             factoryConstructorsStringBuilder.AppendFormat(@"
         {{
             {0}
@@ -396,14 +408,10 @@
         }
 
         private string BuildFactoryImplementationMethodsCodeSection(INamedTypeSymbol concreteClassSymbol,
-                                                                    INamedTypeSymbol factoryInterfaceSymbol,
-                                                                    IParameterSymbol[] injectedParameters)
+                                                                    IParameterSymbol[] injectedParameters,
+                                                                    IMethodSymbol[] factoryMethods)
         {
             var factoryMethodsStringBuilder = new StringBuilder();
-            var factoryMethods = factoryInterfaceSymbol.GetMembers()
-                                                       .OfType<IMethodSymbol>()
-                                                       .Where(methodSymbol => concreteClassSymbol.AllInterfaces.Select(i => i.OriginalDefinition).Contains(methodSymbol.ReturnType.OriginalDefinition))
-                                                       .ToArray();
 
             if (factoryMethods.Any())
             {
@@ -463,6 +471,7 @@
                                                                  concreteClassSymbol,
                                                                  GetParameterListCodeSection(selectedConstructor, injectedParameters));
                     }
+
                     factoryMethodsStringBuilder.AppendLine();
                     factoryMethodsStringBuilder.AppendLine();
                 }
@@ -575,24 +584,15 @@
             var outerUsingDeclarations = FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<CompilationUnitSyntax>().Usings, usingsToFilterOut);
             var innerUsingDeclarations = FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<NamespaceDeclarationSyntax>().Usings, usingsToFilterOut);
 
-            var contractTypeMethods = factoryInterfaceTypeSymbol.GetMembers().OfType<IMethodSymbol>().ToArray();
-            var allContractMethodParameters = contractTypeMethods.SelectMany(contractTypeMethod => contractTypeMethod.Parameters).ToArray();
-            if (!contractTypeMethods.Any())
+            var factoryInterfaceMethods = GetSuitableFactoryInterfaceMethods(concreteClassTypeSymbol, factoryInterfaceTypeSymbol);
+
+            var allContractMethodParameters = factoryInterfaceMethods.SelectMany(contractTypeMethod => contractTypeMethod.Parameters).ToArray();
+            if (!factoryInterfaceMethods.Any())
             {
-                Logger.Warn("No Methods! Looking for parent interfaces...");
-                foreach (var factoryParentInterfaceContractType in factoryInterfaceTypeSymbol.AllInterfaces)
-                {
-                    Logger.DebugFormat("  inheritedFrom = {0}", factoryParentInterfaceContractType.ToDisplayString());
-
-                    contractTypeMethods = factoryParentInterfaceContractType.GetMembers().OfType<IMethodSymbol>().ToArray();
-                    allContractMethodParameters = contractTypeMethods.SelectMany(contractTypeMethod => contractTypeMethod.Parameters).ToArray();
-                    var parametersString = string.Join(", ", allContractMethodParameters.Select(x => x.Name));
-
-                    Logger.DebugFormat("  parameters from inheritance : {0}", parametersString);
-                }
+                throw new InvalidOperationException("The interface {0} has no suitable method returning any interface implemented by {1}. Please check if their is any.".FormatWith(factoryInterfaceTypeSymbol, concreteClassTypeSymbol));
             }
 
-            var allConstructorParameters = contractTypeMethods.Select(factoryMethod => SelectConstructorFromFactoryMethod(factoryMethod, concreteClassTypeSymbol))
+            var allConstructorParameters = factoryInterfaceMethods.Select(factoryMethod => SelectConstructorFromFactoryMethod(factoryMethod, concreteClassTypeSymbol))
                                                               .SelectMany(selectedConstructor => selectedConstructor.Parameters)
                                                               .ToArray();
             var injectedParameters = (from parameter in (IEnumerable<IParameterSymbol>)allConstructorParameters
@@ -601,7 +601,7 @@
 
             var factoryFieldsCodeSection = BuildFactoryImplementationFieldsCodeSection(injectedParameters);
             var factoryConstructorsCodeSection = this.BuildFactoryImplementationConstructorsCodeSection(factoryName, concreteClassDeclarationSyntax, injectedParameters);
-            var factoryMethodsCodeSection = this.BuildFactoryImplementationMethodsCodeSection(concreteClassTypeSymbol, factoryInterfaceTypeSymbol, injectedParameters);
+            var factoryMethodsCodeSection = this.BuildFactoryImplementationMethodsCodeSection(concreteClassTypeSymbol, injectedParameters, factoryInterfaceMethods);
 
             var code = @"#pragma warning disable 1591
 
