@@ -179,16 +179,9 @@
         private static Document FindDocumentFromPath(Solution solution,
                                                      string filePath)
         {
-            foreach (var project in solution.Projects)
-            {
-                var document = project.Documents.FirstOrDefault(d => d.FilePath == filePath);
-                if (document != null)
-                {
-                    return document;
-                }
-            }
-
-            return null;
+            return solution.Projects
+                           .Select(project => project.Documents.FirstOrDefault(d => d.FilePath == filePath))
+                           .FirstOrDefault(document => document != null);
         }
 
         private static string GetDeclarationFullName(TypeDeclarationSyntax typeDeclarationSyntax)
@@ -213,11 +206,19 @@
 
         private static AttributeData GetFactoryAttributeFromTypeSymbol(INamedTypeSymbol concreteClassTypeSymbol)
         {
-            var factoryAttribute = concreteClassTypeSymbol.GetAttributes().Single(a =>
+            AttributeData factoryAttribute;
+            try
+            {
+                factoryAttribute = concreteClassTypeSymbol.GetAttributes().Single(a =>
                                                                                   {
                                                                                       var attributeClassFullName = a.AttributeClass.ToString();
                                                                                       return attributeClassFullName.EndsWith(".GenerateFactoryAttribute") || attributeClassFullName.EndsWith(".GenerateFactory");
                                                                                   });
+            }
+            catch (InvalidOperationException e)
+            {
+                throw new InvalidOperationException("Could not read GenerateFactoryAttribute from {0} type.".FormatWith(concreteClassTypeSymbol.Name), e);
+            }
 
             if (factoryAttribute.AttributeClass.Kind == SymbolKind.ErrorType)
             {
@@ -317,11 +318,18 @@
             var instanceConstructors = concreteClassSymbol.InstanceConstructors
                                                           .Where(c => c.DeclaredAccessibility == Accessibility.Public);
 
-            var selectedConstructor = instanceConstructors.OrderBy(c => c.Parameters.Length)
-                                                          .First(c => factoryMethodParameters.Select(fmp => fmp.Name)
-                                                                                             .All(c.Parameters.Select(cp => cp.Name).Contains));
+            try
+            {
+                var selectedConstructor = instanceConstructors.OrderBy(c => c.Parameters.Length)
+                                                              .First(c => factoryMethodParameters.Select(fmp => fmp.Name)
+                                                                                                 .All(c.Parameters.Select(cp => cp.Name).Contains));
 
-            return selectedConstructor;
+                return selectedConstructor;
+            }
+            catch (InvalidOperationException e)
+            {
+                throw new InvalidOperationException("Could not select a constructor from {0} type with the following parameters: ({1}).".FormatWith(concreteClassSymbol.Name, string.Join(", ", factoryMethodParameters.Select(x => x.Name))), e);
+            }
         }
 
         private static void UpdateDocument(Document document,
@@ -593,8 +601,8 @@
             }
 
             var allConstructorParameters = factoryInterfaceMethods.Select(factoryMethod => SelectConstructorFromFactoryMethod(factoryMethod, concreteClassTypeSymbol))
-                                                              .SelectMany(selectedConstructor => selectedConstructor.Parameters)
-                                                              .ToArray();
+                                                                  .SelectMany(selectedConstructor => selectedConstructor.Parameters)
+                                                                  .ToArray();
             var injectedParameters = (from parameter in (IEnumerable<IParameterSymbol>)allConstructorParameters
                                       where !allContractMethodParameters.Any(contractMethodParameter => CompareParameters(contractMethodParameter, parameter))
                                       select parameter).ToArray();
