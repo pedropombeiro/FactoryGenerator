@@ -2,6 +2,7 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.Collections.Immutable;
     using System.Diagnostics;
     using System.IO;
     using System.Linq;
@@ -228,9 +229,10 @@
             return factoryAttribute;
         }
 
-        private static string GetFactoryClassGenericName(ClassDeclarationSyntax concreteTypeDeclarationSyntax)
+        private static string GetFactoryClassGenericName(ClassDeclarationSyntax concreteTypeDeclarationSyntax,
+                                                         INamedTypeSymbol factoryInterfaceTypeSymbol)
         {
-            var factoryClassName = "{0}Factory{1}".FormatWith(concreteTypeDeclarationSyntax.Identifier.ValueText, concreteTypeDeclarationSyntax.TypeParameterList);
+            var factoryClassName = "{0}Factory{1}".FormatWith(concreteTypeDeclarationSyntax.Identifier.ValueText, GetTypeParametersDeclaration(factoryInterfaceTypeSymbol.TypeParameters));
 
             return factoryClassName;
         }
@@ -458,7 +460,7 @@
 
                     if (factoryMethodParameters.Length > 1)
                     {
-                        factoryMethodsStringBuilder.AppendFormat(@"        public {0} Create(
+                        factoryMethodsStringBuilder.AppendFormat(@"        public {0} Create{4}(
             {1})
         {{
             return new {2}({3});
@@ -466,18 +468,20 @@
                                                                  factoryMethod.ReturnType,
                                                                  string.Join(",\r\n            ", parameterListAsText),
                                                                  concreteClassSymbol,
-                                                                 GetParameterListCodeSection(selectedConstructor, injectedParameters));
+                                                                 GetParameterListCodeSection(selectedConstructor, injectedParameters),
+                                                                 GetTypeParametersDeclaration(factoryMethod.TypeParameters));
                     }
                     else
                     {
-                        factoryMethodsStringBuilder.AppendFormat(@"        public {0} Create({1})
+                        factoryMethodsStringBuilder.AppendFormat(@"        public {0} Create{4}({1})
         {{
             return new {2}({3});
         }}",
                                                                  factoryMethod.ReturnType,
                                                                  string.Join(", ", parameterListAsText),
                                                                  concreteClassSymbol,
-                                                                 GetParameterListCodeSection(selectedConstructor, injectedParameters));
+                                                                 GetParameterListCodeSection(selectedConstructor, injectedParameters),
+                                                                 GetTypeParametersDeclaration(factoryMethod.TypeParameters));
                     }
 
                     factoryMethodsStringBuilder.AppendLine();
@@ -488,6 +492,17 @@
             }
 
             return factoryMethodsStringBuilder.ToString();
+        }
+
+        private static string GetTypeParametersDeclaration(ImmutableArray<ITypeParameterSymbol> typeParameterSymbols)
+        {
+            string typeParameters = string.Empty;
+
+            if (typeParameterSymbols.Length > 0)
+            {
+                typeParameters = "<{0}>".FormatWith(string.Join(" ,", typeParameterSymbols.Select(t => t.Name)));
+            }
+            return typeParameters;
         }
 
         private async Task<ICollection<string>> GenerateFactoriesInProjectAsync(Compilation compilation)
@@ -546,7 +561,7 @@
                 throw new InvalidOperationException("Factory type must be specified in {0} on {1}.".FormatWith(factoryAttribute.AttributeClass, GetDeclarationFullName(concreteClassDeclarationSyntax)));
             }
 
-            var factoryClassGenericName = GetFactoryClassGenericName(concreteClassDeclarationSyntax);
+            var factoryClassGenericName = GetFactoryClassGenericName(concreteClassDeclarationSyntax, factoryInterfaceTypeSymbol);
             var factoryInterfaceFullName = factoryInterfaceTypeSymbol.ToString();
 
             Logger.InfoFormat("Rendering factory implementation {0}\r\n\tfor factory interface {1}\r\n\ttargeting {2}...", factoryClassGenericName, factoryInterfaceFullName, GetDeclarationFullName(concreteClassDeclarationSyntax));
@@ -632,7 +647,7 @@
                 .Replace("<#=innerUsings#>", innerUsingDeclarations.Any()
                                                  ? "\r\n{0}".FormatWith(innerUsingDeclarations.ToFullString())
                                                  : string.Empty)
-                .Replace("<#=factoryTypeName#>", GetFactoryClassGenericName(concreteClassDeclarationSyntax))
+                .Replace("<#=factoryTypeName#>", GetFactoryClassGenericName(concreteClassDeclarationSyntax, factoryInterfaceTypeSymbol))
                 .Replace("<#=factoryContractTypeFullName#>", factoryInterfaceTypeSymbol.ToString())
                 .Replace("<#=GeneratedCodeAttribute#>", string.Format("global::System.CodeDom.Compiler.GeneratedCode(\"DeveloperInTheFlow.FactoryGenerator\", \"{0}\")", this.version))
                 .Replace("<#=concreteXmlDocSafeTypeName#>", GetXmlDocSafeTypeName(concreteClassTypeSymbol.ToString()))
