@@ -318,13 +318,15 @@
 
             var factoryMethodParameters = factoryMethod.Parameters;
             var instanceConstructors = concreteClassSymbol.InstanceConstructors
-                                                          .Where(c => c.DeclaredAccessibility == Accessibility.Public);
+                                                          .Where(c => c.DeclaredAccessibility == Accessibility.Public)
+                                                          .OrderByDescending(c => c.Parameters.Length)
+                                                          .ToArray();
 
             try
             {
-                var selectedConstructor = instanceConstructors.OrderBy(c => c.Parameters.Length)
-                                                              .First(c => factoryMethodParameters.Select(fmp => fmp.Name)
-                                                                                                 .All(c.Parameters.Select(cp => cp.Name).Contains));
+                var matchedInstanceConstructors = instanceConstructors.GroupBy(c => factoryMethodParameters.Select(fmp => fmp.Name)
+                                                                                                           .Count(c.Parameters.Select(cp => cp.Name).Contains));
+                var selectedConstructor = matchedInstanceConstructors.OrderByDescending(g => g.Key).First().Single();
 
                 return selectedConstructor;
             }
