@@ -319,14 +319,20 @@
             var factoryMethodParameters = factoryMethod.Parameters;
             var instanceConstructors = concreteClassSymbol.InstanceConstructors
                                                           .Where(c => c.DeclaredAccessibility == Accessibility.Public)
-                                                          .OrderByDescending(c => c.Parameters.Length)
                                                           .ToArray();
 
             try
             {
                 var matchedInstanceConstructors = instanceConstructors.GroupBy(c => factoryMethodParameters.Select(fmp => fmp.Name)
-                                                                                                           .Count(c.Parameters.Select(cp => cp.Name).Contains));
-                var selectedConstructor = matchedInstanceConstructors.OrderByDescending(g => g.Key).First().Single();
+                                                                                                           .Count(c.Parameters.Select(cp => cp.Name).Contains))
+                                                                      .ToArray();
+                var selectedGrouping = matchedInstanceConstructors.SingleOrDefault(g => g.Key == factoryMethodParameters.Length);
+                if (selectedGrouping == null)
+                {
+                    selectedGrouping = matchedInstanceConstructors.OrderBy(g => g.Key - factoryMethodParameters.Length).First();
+                }
+
+                var selectedConstructor = selectedGrouping.First();
 
                 return selectedConstructor;
             }
