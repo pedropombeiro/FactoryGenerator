@@ -1,2 +1,2 @@
-AutoGenFactories
+FactoryGenerator
 ================
