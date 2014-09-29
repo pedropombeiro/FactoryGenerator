@@ -139,10 +139,10 @@
                     syntaxRootNode.DescendantNodesAndSelf(syntaxNode => !(syntaxNode is ClassDeclarationSyntax))
                                   .OfType<ClassDeclarationSyntax>()
                                   .Where(classDeclarationSyntax => classDeclarationSyntax.AttributeLists.Count > 0 && classDeclarationSyntax.AttributeLists.SelectMany(a => a.Attributes).Any(x =>
-                                                                                                                                                                                              {
-                                                                                                                                                                                                  var attributeClassName = x.Name.ToString();
-                                                                                                                                                                                                  return attributeClassName == "global::System.CodeDom.Compiler.GeneratedCode";
-                                                                                                                                                                                              }))
+                                                                                                                                                                                                  {
+                                                                                                                                                                                                      var attributeClassName = x.Name.ToString();
+                                                                                                                                                                                                      return attributeClassName == "global::System.CodeDom.Compiler.GeneratedCode";
+                                                                                                                                                                                                  }))
                                   .ToArray();
 
                 if (generatedFactoryClassDeclarations.Any())
@@ -211,10 +211,10 @@
             try
             {
                 factoryAttribute = concreteClassTypeSymbol.GetAttributes().Single(a =>
-                                                                                  {
-                                                                                      var attributeClassFullName = a.AttributeClass.ToString();
-                                                                                      return attributeClassFullName.EndsWith(".GenerateFactoryAttribute") || attributeClassFullName.EndsWith(".GenerateFactory");
-                                                                                  });
+                                                                                      {
+                                                                                          var attributeClassFullName = a.AttributeClass.ToString();
+                                                                                          return attributeClassFullName.EndsWith(".GenerateFactoryAttribute") || attributeClassFullName.EndsWith(".GenerateFactory");
+                                                                                      });
             }
             catch (InvalidOperationException e)
             {
@@ -275,6 +275,18 @@
                 .ToArray();
         }
 
+        private static string GetTypeParametersDeclaration(ImmutableArray<ITypeParameterSymbol> typeParameterSymbols)
+        {
+            var typeParameters = string.Empty;
+
+            if (typeParameterSymbols.Length > 0)
+            {
+                typeParameters = "<{0}>".FormatWith(string.Join(" ,", typeParameterSymbols.Select(t => t.Name)));
+            }
+
+            return typeParameters;
+        }
+
         private static string GetXmlDocSafeTypeName(string typeName)
         {
             return typeName.Replace("<", "{").Replace(">", "}");
@@ -286,13 +298,13 @@
 
             return attributeListSyntaxes.Count > 0 &&
                    attributeListSyntaxes.SelectMany(a => a.Attributes).Any(x =>
-                                                                           {
-                                                                               var qualifiedNameSyntax = x.Name as Microsoft.CodeAnalysis.CSharp.Syntax.QualifiedNameSyntax;
-                                                                               var attributeClassName = qualifiedNameSyntax != null
-                                                                                                            ? qualifiedNameSyntax.Right.Identifier.ToString()
-                                                                                                            : x.Name.ToString();
-                                                                               return attributeClassName == "GenerateFactory" || attributeClassName == "GenerateFactoryAttribute";
-                                                                           });
+                                                                               {
+                                                                                   var qualifiedNameSyntax = x.Name as Microsoft.CodeAnalysis.CSharp.Syntax.QualifiedNameSyntax;
+                                                                                   var attributeClassName = qualifiedNameSyntax != null
+                                                                                                                ? qualifiedNameSyntax.Right.Identifier.ToString()
+                                                                                                                : x.Name.ToString();
+                                                                                   return attributeClassName == "GenerateFactory" || attributeClassName == "GenerateFactoryAttribute";
+                                                                               });
         }
 
         private static void LogCodeGenerationStatistics(Stopwatch chrono,
@@ -386,10 +398,10 @@
                                                                          .SelectMany(cs => cs.AttributeLists.SelectMany(al => al.Attributes))
                                                                          .ToArray();
             var importedConstructorAttributes = allConstructorAttributes.Where(attributeSyntax =>
-                                                                               {
-                                                                                   var attributeName = attributeSyntax.Name.ToString();
-                                                                                   return this.attributeImportList.Any(attributeName.Contains);
-                                                                               })
+                                                                                   {
+                                                                                       var attributeName = attributeSyntax.Name.ToString();
+                                                                                       return this.attributeImportList.Any(attributeName.Contains);
+                                                                                   })
                                                                         .ToArray();
 
             factoryConstructorsStringBuilder.AppendLine("        #region Constructors");
@@ -445,14 +457,14 @@
                     var selectedConstructor = SelectConstructorFromFactoryMethod(factoryMethod, concreteClassSymbol);
                     var factoryMethodParameters = factoryMethod.Parameters;
                     var parameterListAsText = factoryMethodParameters.Select(p =>
-                                                                             {
-                                                                                 var attributes = p.GetAttributes();
-                                                                                 var attributeSection = attributes.Any()
-                                                                                                            ? "[{0}] ".FormatWith(string.Join(", ", attributes.Select(a => a.ToString())))
-                                                                                                            : string.Empty;
+                                                                                 {
+                                                                                     var attributes = p.GetAttributes();
+                                                                                     var attributeSection = attributes.Any()
+                                                                                                                ? "[{0}] ".FormatWith(string.Join(", ", attributes.Select(a => a.ToString())))
+                                                                                                                : string.Empty;
 
-                                                                                 return "{0}{1} {2}".FormatWith(attributeSection, p.Type, p.Name);
-                                                                             });
+                                                                                     return "{0}{1} {2}".FormatWith(attributeSection, p.Type, p.Name);
+                                                                                 });
 
                     if (this.writeXmlDoc)
                     {
@@ -506,17 +518,6 @@
             return factoryMethodsStringBuilder.ToString();
         }
 
-        private static string GetTypeParametersDeclaration(ImmutableArray<ITypeParameterSymbol> typeParameterSymbols)
-        {
-            string typeParameters = string.Empty;
-
-            if (typeParameterSymbols.Length > 0)
-            {
-                typeParameters = "<{0}>".FormatWith(string.Join(" ,", typeParameterSymbols.Select(t => t.Name)));
-            }
-            return typeParameters;
-        }
-
         private async Task<ICollection<string>> GenerateFactoriesInProjectAsync(Compilation compilation)
         {
             var generatedFactoriesList = new List<string>();
@@ -529,8 +530,8 @@
                                   .OfType<ClassDeclarationSyntax>()
                                   .Where(IsTypeDeclarationSyntaxFactoryTarget)
                                   .ToArray();
-                //new SyntaxWalker().Visit(syntaxRootNode);
 
+                // new SyntaxWalker().Visit(syntaxRootNode);
                 if (classDeclarations.Any())
                 {
                     foreach (var classDeclarationSyntax in classDeclarations)
