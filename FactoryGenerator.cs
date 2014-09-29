@@ -114,7 +114,7 @@
             fieldsStringBuilder.AppendLine("        #region Fields");
             fieldsStringBuilder.AppendLine();
 
-            foreach (var injectedParameter in injectedParameters)
+            foreach (var injectedParameter in injectedParameters.Distinct(new ParameterEqualityComparer()))
             {
                 fieldsStringBuilder.AppendFormat("        private readonly {0} {1};",
                                                  injectedParameter.Type,
@@ -139,10 +139,10 @@
                     syntaxRootNode.DescendantNodesAndSelf(syntaxNode => !(syntaxNode is ClassDeclarationSyntax))
                                   .OfType<ClassDeclarationSyntax>()
                                   .Where(classDeclarationSyntax => classDeclarationSyntax.AttributeLists.Count > 0 && classDeclarationSyntax.AttributeLists.SelectMany(a => a.Attributes).Any(x =>
-                                                                                                                                                                                                  {
-                                                                                                                                                                                                      var attributeClassName = x.Name.ToString();
-                                                                                                                                                                                                      return attributeClassName == "global::System.CodeDom.Compiler.GeneratedCode";
-                                                                                                                                                                                                  }))
+                                                                                                                                                                                              {
+                                                                                                                                                                                                  var attributeClassName = x.Name.ToString();
+                                                                                                                                                                                                  return attributeClassName == "global::System.CodeDom.Compiler.GeneratedCode";
+                                                                                                                                                                                              }))
                                   .ToArray();
 
                 if (generatedFactoryClassDeclarations.Any())
@@ -211,10 +211,10 @@
             try
             {
                 factoryAttribute = concreteClassTypeSymbol.GetAttributes().Single(a =>
-                                                                                      {
-                                                                                          var attributeClassFullName = a.AttributeClass.ToString();
-                                                                                          return attributeClassFullName.EndsWith(".GenerateFactoryAttribute") || attributeClassFullName.EndsWith(".GenerateFactory");
-                                                                                      });
+                                                                                  {
+                                                                                      var attributeClassFullName = a.AttributeClass.ToString();
+                                                                                      return attributeClassFullName.EndsWith(".GenerateFactoryAttribute") || attributeClassFullName.EndsWith(".GenerateFactory");
+                                                                                  });
             }
             catch (InvalidOperationException e)
             {
@@ -298,13 +298,13 @@
 
             return attributeListSyntaxes.Count > 0 &&
                    attributeListSyntaxes.SelectMany(a => a.Attributes).Any(x =>
-                                                                               {
-                                                                                   var qualifiedNameSyntax = x.Name as Microsoft.CodeAnalysis.CSharp.Syntax.QualifiedNameSyntax;
-                                                                                   var attributeClassName = qualifiedNameSyntax != null
-                                                                                                                ? qualifiedNameSyntax.Right.Identifier.ToString()
-                                                                                                                : x.Name.ToString();
-                                                                                   return attributeClassName == "GenerateFactory" || attributeClassName == "GenerateFactoryAttribute";
-                                                                               });
+                                                                           {
+                                                                               var qualifiedNameSyntax = x.Name as Microsoft.CodeAnalysis.CSharp.Syntax.QualifiedNameSyntax;
+                                                                               var attributeClassName = qualifiedNameSyntax != null
+                                                                                                            ? qualifiedNameSyntax.Right.Identifier.ToString()
+                                                                                                            : x.Name.ToString();
+                                                                               return attributeClassName == "GenerateFactory" || attributeClassName == "GenerateFactoryAttribute";
+                                                                           });
         }
 
         private static void LogCodeGenerationStatistics(Stopwatch chrono,
@@ -398,10 +398,10 @@
                                                                          .SelectMany(cs => cs.AttributeLists.SelectMany(al => al.Attributes))
                                                                          .ToArray();
             var importedConstructorAttributes = allConstructorAttributes.Where(attributeSyntax =>
-                                                                                   {
-                                                                                       var attributeName = attributeSyntax.Name.ToString();
-                                                                                       return this.attributeImportList.Any(attributeName.Contains);
-                                                                                   })
+                                                                               {
+                                                                                   var attributeName = attributeSyntax.Name.ToString();
+                                                                                   return this.attributeImportList.Any(attributeName.Contains);
+                                                                               })
                                                                         .ToArray();
 
             factoryConstructorsStringBuilder.AppendLine("        #region Constructors");
@@ -457,14 +457,14 @@
                     var selectedConstructor = SelectConstructorFromFactoryMethod(factoryMethod, concreteClassSymbol);
                     var factoryMethodParameters = factoryMethod.Parameters;
                     var parameterListAsText = factoryMethodParameters.Select(p =>
-                                                                                 {
-                                                                                     var attributes = p.GetAttributes();
-                                                                                     var attributeSection = attributes.Any()
-                                                                                                                ? "[{0}] ".FormatWith(string.Join(", ", attributes.Select(a => a.ToString())))
-                                                                                                                : string.Empty;
+                                                                             {
+                                                                                 var attributes = p.GetAttributes();
+                                                                                 var attributeSection = attributes.Any()
+                                                                                                            ? "[{0}] ".FormatWith(string.Join(", ", attributes.Select(a => a.ToString())))
+                                                                                                            : string.Empty;
 
-                                                                                     return "{0}{1} {2}".FormatWith(attributeSection, p.Type, p.Name);
-                                                                                 });
+                                                                                 return "{0}{1} {2}".FormatWith(attributeSection, p.Type, p.Name);
+                                                                             });
 
                     if (this.writeXmlDoc)
                     {
@@ -629,12 +629,12 @@
                 throw new InvalidOperationException("The interface {0} has no suitable method returning any interface implemented by {1}. Please check if their is any.".FormatWith(factoryInterfaceTypeSymbol, concreteClassTypeSymbol));
             }
 
-            var factoryParameters = factoryInterfaceMethods.Select(factoryMethod => SelectConstructorFromFactoryMethod(factoryMethod, concreteClassTypeSymbol))
-                                                           .SelectMany(selectedConstructor => selectedConstructor.Parameters).ToArray();
-            var constructorParametersWithoutSelf = factoryParameters.Where((p) => p.Type.Name == factoryInterfaceTypeSymbol.Name).ToArray();
-            var allConstructorParameters = factoryParameters.Where((p) => !constructorParametersWithoutSelf.Contains(p))
-                                                            .ToArray();
-            var injectedParameters = (from parameter in (IEnumerable<IParameterSymbol>)allConstructorParameters
+            var allConstructorParameters = factoryInterfaceMethods.Select(factoryMethod => SelectConstructorFromFactoryMethod(factoryMethod, concreteClassTypeSymbol))
+                                                                  .SelectMany(selectedConstructor => selectedConstructor.Parameters).ToArray();
+            var constructorParametersUsingSelfType = allConstructorParameters.Where(p => p.Type.Name == factoryInterfaceTypeSymbol.Name).ToArray();
+            var constructorParametersWithoutSelfType = allConstructorParameters.Except(constructorParametersUsingSelfType)
+                                                                               .ToArray();
+            var injectedParameters = (from parameter in (IEnumerable<IParameterSymbol>)constructorParametersWithoutSelfType
                                       where !allContractMethodParameters.Any(contractMethodParameter => CompareParameters(contractMethodParameter, parameter))
                                       select parameter).ToArray();
 
@@ -693,5 +693,37 @@
         }
 
         #endregion
+
+        private class ParameterEqualityComparer : IEqualityComparer<IParameterSymbol>
+        {
+            #region Public Methods and Operators
+
+            /// <summary>
+            /// Determines whether the specified objects are equal.
+            /// </summary>
+            /// <returns>
+            /// true if the specified objects are equal; otherwise, false.
+            /// </returns>
+            /// <param name="x">The first object of type <paramref name="T"/> to compare.</param><param name="y">The second object of type <paramref name="T"/> to compare.</param>
+            public bool Equals(IParameterSymbol x,
+                               IParameterSymbol y)
+            {
+                return x.Name.Equals(y.Name) && x.Type.Name.Equals(y.Type.Name);
+            }
+
+            /// <summary>
+            /// Returns a hash code for the specified object.
+            /// </summary>
+            /// <returns>
+            /// A hash code for the specified object.
+            /// </returns>
+            /// <param name="obj">The <see cref="T:System.Object"/> for which a hash code is to be returned.</param><exception cref="T:System.ArgumentNullException">The type of <paramref name="obj"/> is a reference type and <paramref name="obj"/> is null.</exception>
+            public int GetHashCode(IParameterSymbol obj)
+            {
+                return obj.GetHashCode();
+            }
+
+            #endregion
+        }
     }
 }
