@@ -139,10 +139,10 @@
                     syntaxRootNode.DescendantNodesAndSelf(syntaxNode => !(syntaxNode is ClassDeclarationSyntax))
                                   .OfType<ClassDeclarationSyntax>()
                                   .Where(classDeclarationSyntax => classDeclarationSyntax.AttributeLists.Count > 0 && classDeclarationSyntax.AttributeLists.SelectMany(a => a.Attributes).Any(x =>
-                                                                                                                                                                                              {
-                                                                                                                                                                                                  var attributeClassName = x.Name.ToString();
-                                                                                                                                                                                                  return attributeClassName == "global::System.CodeDom.Compiler.GeneratedCode";
-                                                                                                                                                                                              }))
+                                                                                                                                                                                                  {
+                                                                                                                                                                                                      var attributeClassName = x.Name.ToString();
+                                                                                                                                                                                                      return attributeClassName == "global::System.CodeDom.Compiler.GeneratedCode";
+                                                                                                                                                                                                  }))
                                   .ToArray();
 
                 if (generatedFactoryClassDeclarations.Any())
@@ -211,10 +211,10 @@
             try
             {
                 factoryAttribute = concreteClassTypeSymbol.GetAttributes().Single(a =>
-                                                                                  {
-                                                                                      var attributeClassFullName = a.AttributeClass.ToString();
-                                                                                      return attributeClassFullName.EndsWith(".GenerateFactoryAttribute") || attributeClassFullName.EndsWith(".GenerateFactory");
-                                                                                  });
+                                                                                      {
+                                                                                          var attributeClassFullName = a.AttributeClass.ToString();
+                                                                                          return attributeClassFullName.EndsWith(".GenerateFactoryAttribute") || attributeClassFullName.EndsWith(".GenerateFactory");
+                                                                                      });
             }
             catch (InvalidOperationException e)
             {
@@ -238,14 +238,17 @@
         }
 
         private static string GetParameterListCodeSection(IMethodSymbol constructor,
-                                                          IEnumerable<IParameterSymbol> injectedParameters)
+                                                          IEnumerable<IParameterSymbol> injectedParameters,
+                                                          string factoryInterfaceName)
         {
             var parametersRepresentation = constructor.Parameters.Select(parameter =>
                                                                          "{0}{1}{2}".FormatWith(injectedParameters.Select(p => p.Name).Contains(parameter.Name)
                                                                                                     ? "this."
                                                                                                     : string.Empty,
                                                                                                 string.Empty /*GetParameterModifiers(parameter)*/,
-                                                                                                parameter.Name));
+                                                                                                parameter.Type.Name == factoryInterfaceName
+                                                                                                    ? "this"
+                                                                                                    : parameter.Name));
             if (constructor.Parameters.Length > 1)
             {
                 return "\r\n                {0}".FormatWith(string.Join(", \r\n                ", parametersRepresentation));
@@ -272,6 +275,18 @@
                 .ToArray();
         }
 
+        private static string GetTypeParametersDeclaration(ImmutableArray<ITypeParameterSymbol> typeParameterSymbols)
+        {
+            var typeParameters = string.Empty;
+
+            if (typeParameterSymbols.Length > 0)
+            {
+                typeParameters = "<{0}>".FormatWith(string.Join(" ,", typeParameterSymbols.Select(t => t.Name)));
+            }
+
+            return typeParameters;
+        }
+
         private static string GetXmlDocSafeTypeName(string typeName)
         {
             return typeName.Replace("<", "{").Replace(">", "}");
@@ -283,13 +298,13 @@
 
             return attributeListSyntaxes.Count > 0 &&
                    attributeListSyntaxes.SelectMany(a => a.Attributes).Any(x =>
-                                                                           {
-                                                                               var qualifiedNameSyntax = x.Name as Microsoft.CodeAnalysis.CSharp.Syntax.QualifiedNameSyntax;
-                                                                               var attributeClassName = qualifiedNameSyntax != null
-                                                                                                            ? qualifiedNameSyntax.Right.Identifier.ToString()
-                                                                                                            : x.Name.ToString();
-                                                                               return attributeClassName == "GenerateFactory" || attributeClassName == "GenerateFactoryAttribute";
-                                                                           });
+                                                                               {
+                                                                                   var qualifiedNameSyntax = x.Name as Microsoft.CodeAnalysis.CSharp.Syntax.QualifiedNameSyntax;
+                                                                                   var attributeClassName = qualifiedNameSyntax != null
+                                                                                                                ? qualifiedNameSyntax.Right.Identifier.ToString()
+                                                                                                                : x.Name.ToString();
+                                                                                   return attributeClassName == "GenerateFactory" || attributeClassName == "GenerateFactoryAttribute";
+                                                                               });
         }
 
         private static void LogCodeGenerationStatistics(Stopwatch chrono,
@@ -383,10 +398,10 @@
                                                                          .SelectMany(cs => cs.AttributeLists.SelectMany(al => al.Attributes))
                                                                          .ToArray();
             var importedConstructorAttributes = allConstructorAttributes.Where(attributeSyntax =>
-                                                                               {
-                                                                                   var attributeName = attributeSyntax.Name.ToString();
-                                                                                   return this.attributeImportList.Any(attributeName.Contains);
-                                                                               })
+                                                                                   {
+                                                                                       var attributeName = attributeSyntax.Name.ToString();
+                                                                                       return this.attributeImportList.Any(attributeName.Contains);
+                                                                                   })
                                                                         .ToArray();
 
             factoryConstructorsStringBuilder.AppendLine("        #region Constructors");
@@ -427,7 +442,8 @@
 
         private string BuildFactoryImplementationMethodsCodeSection(INamedTypeSymbol concreteClassSymbol,
                                                                     IParameterSymbol[] injectedParameters,
-                                                                    IMethodSymbol[] factoryMethods)
+                                                                    IMethodSymbol[] factoryMethods,
+                                                                    string factoryInterfaceName)
         {
             var factoryMethodsStringBuilder = new StringBuilder();
 
@@ -441,14 +457,14 @@
                     var selectedConstructor = SelectConstructorFromFactoryMethod(factoryMethod, concreteClassSymbol);
                     var factoryMethodParameters = factoryMethod.Parameters;
                     var parameterListAsText = factoryMethodParameters.Select(p =>
-                                                                             {
-                                                                                 var attributes = p.GetAttributes();
-                                                                                 var attributeSection = attributes.Any()
-                                                                                                            ? "[{0}] ".FormatWith(string.Join(", ", attributes.Select(a => a.ToString())))
-                                                                                                            : string.Empty;
+                                                                                 {
+                                                                                     var attributes = p.GetAttributes();
+                                                                                     var attributeSection = attributes.Any()
+                                                                                                                ? "[{0}] ".FormatWith(string.Join(", ", attributes.Select(a => a.ToString())))
+                                                                                                                : string.Empty;
 
-                                                                                 return "{0}{1} {2}".FormatWith(attributeSection, p.Type, p.Name);
-                                                                             });
+                                                                                     return "{0}{1} {2}".FormatWith(attributeSection, p.Type, p.Name);
+                                                                                 });
 
                     if (this.writeXmlDoc)
                     {
@@ -476,7 +492,7 @@
                                                                  factoryMethod.ReturnType,
                                                                  string.Join(",\r\n            ", parameterListAsText),
                                                                  concreteClassSymbol,
-                                                                 GetParameterListCodeSection(selectedConstructor, injectedParameters),
+                                                                 GetParameterListCodeSection(selectedConstructor, injectedParameters, factoryInterfaceName),
                                                                  GetTypeParametersDeclaration(factoryMethod.TypeParameters));
                     }
                     else
@@ -488,7 +504,7 @@
                                                                  factoryMethod.ReturnType,
                                                                  string.Join(", ", parameterListAsText),
                                                                  concreteClassSymbol,
-                                                                 GetParameterListCodeSection(selectedConstructor, injectedParameters),
+                                                                 GetParameterListCodeSection(selectedConstructor, injectedParameters, factoryInterfaceName),
                                                                  GetTypeParametersDeclaration(factoryMethod.TypeParameters));
                     }
 
@@ -500,17 +516,6 @@
             }
 
             return factoryMethodsStringBuilder.ToString();
-        }
-
-        private static string GetTypeParametersDeclaration(ImmutableArray<ITypeParameterSymbol> typeParameterSymbols)
-        {
-            string typeParameters = string.Empty;
-
-            if (typeParameterSymbols.Length > 0)
-            {
-                typeParameters = "<{0}>".FormatWith(string.Join(" ,", typeParameterSymbols.Select(t => t.Name)));
-            }
-            return typeParameters;
         }
 
         private async Task<ICollection<string>> GenerateFactoriesInProjectAsync(Compilation compilation)
@@ -525,8 +530,8 @@
                                   .OfType<ClassDeclarationSyntax>()
                                   .Where(IsTypeDeclarationSyntaxFactoryTarget)
                                   .ToArray();
-                //new SyntaxWalker().Visit(syntaxRootNode);
 
+                // new SyntaxWalker().Visit(syntaxRootNode);
                 if (classDeclarations.Any())
                 {
                     foreach (var classDeclarationSyntax in classDeclarations)
@@ -610,6 +615,7 @@
                                                    string factoryName)
         {
             var fileName = "{0}.Generated.cs".FormatWith(factoryName);
+            var factoryInterfaceName = factoryInterfaceTypeSymbol.Name;
 
             var usingsToFilterOut = new[] { concreteClassTypeSymbol.ContainingNamespace.ToString() };
             var outerUsingDeclarations = FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<CompilationUnitSyntax>().Usings, usingsToFilterOut);
@@ -623,16 +629,18 @@
                 throw new InvalidOperationException("The interface {0} has no suitable method returning any interface implemented by {1}. Please check if their is any.".FormatWith(factoryInterfaceTypeSymbol, concreteClassTypeSymbol));
             }
 
-            var allConstructorParameters = factoryInterfaceMethods.Select(factoryMethod => SelectConstructorFromFactoryMethod(factoryMethod, concreteClassTypeSymbol))
-                                                                  .SelectMany(selectedConstructor => selectedConstructor.Parameters)
-                                                                  .ToArray();
+            var factoryParameters = factoryInterfaceMethods.Select(factoryMethod => SelectConstructorFromFactoryMethod(factoryMethod, concreteClassTypeSymbol))
+                                                           .SelectMany(selectedConstructor => selectedConstructor.Parameters).ToArray();
+            var constructorParametersWithoutSelf = factoryParameters.Where((p) => p.Type.Name == factoryInterfaceTypeSymbol.Name).ToArray();
+            var allConstructorParameters = factoryParameters.Where((p) => !constructorParametersWithoutSelf.Contains(p))
+                                                            .ToArray();
             var injectedParameters = (from parameter in (IEnumerable<IParameterSymbol>)allConstructorParameters
                                       where !allContractMethodParameters.Any(contractMethodParameter => CompareParameters(contractMethodParameter, parameter))
                                       select parameter).ToArray();
 
             var factoryFieldsCodeSection = BuildFactoryImplementationFieldsCodeSection(injectedParameters);
             var factoryConstructorsCodeSection = this.BuildFactoryImplementationConstructorsCodeSection(factoryName, concreteClassDeclarationSyntax, injectedParameters);
-            var factoryMethodsCodeSection = this.BuildFactoryImplementationMethodsCodeSection(concreteClassTypeSymbol, injectedParameters, factoryInterfaceMethods);
+            var factoryMethodsCodeSection = this.BuildFactoryImplementationMethodsCodeSection(concreteClassTypeSymbol, injectedParameters, factoryInterfaceMethods, factoryInterfaceName);
 
             var code = @"#pragma warning disable 1591
 
