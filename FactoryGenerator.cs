@@ -114,7 +114,7 @@
             fieldsStringBuilder.AppendLine("        #region Fields");
             fieldsStringBuilder.AppendLine();
 
-            foreach (var injectedParameter in injectedParameters.Distinct(new ParameterEqualityComparer()))
+            foreach (var injectedParameter in injectedParameters)
             {
                 fieldsStringBuilder.AppendFormat("        private readonly {0} {1};",
                                                  injectedParameter.Type,
@@ -423,8 +423,7 @@
                 factoryConstructorsStringBuilder.AppendFormat(@"        public {0}(
             {1})",
                                                               factoryImplementationTypeName,
-                                                              string.Join(",\r\n            ", injectedParameters.Select(p => p.DeclaringSyntaxReferences[0].GetSyntax().ToString())));
-            }
+                                                              string.Join(",\r\n            ", injectedParameters.Select(p => p.DeclaringSyntaxReferences[0].GetSyntax().ToString())));}
 
             factoryConstructorsStringBuilder.AppendFormat(@"
         {{
@@ -636,7 +635,7 @@
                                                                                .ToArray();
             var injectedParameters = (from parameter in (IEnumerable<IParameterSymbol>)constructorParametersWithoutSelfType
                                       where !allContractMethodParameters.Any(contractMethodParameter => CompareParameters(contractMethodParameter, parameter))
-                                      select parameter).ToArray();
+                                      select parameter).Distinct(new ParameterEqualityComparer()).ToArray();
 
             var factoryFieldsCodeSection = BuildFactoryImplementationFieldsCodeSection(injectedParameters);
             var factoryConstructorsCodeSection = this.BuildFactoryImplementationConstructorsCodeSection(factoryName, concreteClassDeclarationSyntax, injectedParameters);
@@ -720,7 +719,14 @@
             /// <param name="obj">The <see cref="T:System.Object"/> for which a hash code is to be returned.</param><exception cref="T:System.ArgumentNullException">The type of <paramref name="obj"/> is a reference type and <paramref name="obj"/> is null.</exception>
             public int GetHashCode(IParameterSymbol obj)
             {
-                return obj.GetHashCode();
+                unchecked
+                {
+                    return ((obj.Name != null
+                                 ? obj.Name.GetHashCode()
+                                 : 0) * 397) ^ (obj.Type.Name != null
+                                                    ? obj.Type.Name.GetHashCode()
+                                                    : 0);
+                }
             }
 
             #endregion
