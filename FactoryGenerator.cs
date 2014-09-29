@@ -238,14 +238,17 @@
         }
 
         private static string GetParameterListCodeSection(IMethodSymbol constructor,
-                                                          IEnumerable<IParameterSymbol> injectedParameters)
+                                                          IEnumerable<IParameterSymbol> injectedParameters,
+                                                          string factoryInterfaceName)
         {
             var parametersRepresentation = constructor.Parameters.Select(parameter =>
                                                                          "{0}{1}{2}".FormatWith(injectedParameters.Select(p => p.Name).Contains(parameter.Name)
                                                                                                     ? "this."
                                                                                                     : string.Empty,
                                                                                                 string.Empty /*GetParameterModifiers(parameter)*/,
-                                                                                                parameter.Name));
+                                                                                                parameter.Type.Name == factoryInterfaceName
+                                                                                                    ? "this"
+                                                                                                    : parameter.Name));
             if (constructor.Parameters.Length > 1)
             {
                 return "\r\n                {0}".FormatWith(string.Join(", \r\n                ", parametersRepresentation));
@@ -427,7 +430,8 @@
 
         private string BuildFactoryImplementationMethodsCodeSection(INamedTypeSymbol concreteClassSymbol,
                                                                     IParameterSymbol[] injectedParameters,
-                                                                    IMethodSymbol[] factoryMethods)
+                                                                    IMethodSymbol[] factoryMethods,
+                                                                    string factoryInterfaceName)
         {
             var factoryMethodsStringBuilder = new StringBuilder();
 
@@ -476,7 +480,7 @@
                                                                  factoryMethod.ReturnType,
                                                                  string.Join(",\r\n            ", parameterListAsText),
                                                                  concreteClassSymbol,
-                                                                 GetParameterListCodeSection(selectedConstructor, injectedParameters),
+                                                                 GetParameterListCodeSection(selectedConstructor, injectedParameters, factoryInterfaceName),
                                                                  GetTypeParametersDeclaration(factoryMethod.TypeParameters));
                     }
                     else
@@ -488,7 +492,7 @@
                                                                  factoryMethod.ReturnType,
                                                                  string.Join(", ", parameterListAsText),
                                                                  concreteClassSymbol,
-                                                                 GetParameterListCodeSection(selectedConstructor, injectedParameters),
+                                                                 GetParameterListCodeSection(selectedConstructor, injectedParameters, factoryInterfaceName),
                                                                  GetTypeParametersDeclaration(factoryMethod.TypeParameters));
                     }
 
@@ -610,6 +614,7 @@
                                                    string factoryName)
         {
             var fileName = "{0}.Generated.cs".FormatWith(factoryName);
+            var factoryInterfaceName = factoryInterfaceTypeSymbol.Name;
 
             var usingsToFilterOut = new[] { concreteClassTypeSymbol.ContainingNamespace.ToString() };
             var outerUsingDeclarations = FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<CompilationUnitSyntax>().Usings, usingsToFilterOut);
@@ -623,16 +628,18 @@
                 throw new InvalidOperationException("The interface {0} has no suitable method returning any interface implemented by {1}. Please check if their is any.".FormatWith(factoryInterfaceTypeSymbol, concreteClassTypeSymbol));
             }
 
-            var allConstructorParameters = factoryInterfaceMethods.Select(factoryMethod => SelectConstructorFromFactoryMethod(factoryMethod, concreteClassTypeSymbol))
-                                                                  .SelectMany(selectedConstructor => selectedConstructor.Parameters)
-                                                                  .ToArray();
+            var factoryParameters = factoryInterfaceMethods.Select(factoryMethod => SelectConstructorFromFactoryMethod(factoryMethod, concreteClassTypeSymbol))
+                                                           .SelectMany(selectedConstructor => selectedConstructor.Parameters).ToArray();
+            var constructorParametersWithoutSelf = factoryParameters.Where((p) => p.Type.Name == factoryInterfaceTypeSymbol.Name).ToArray();
+            var allConstructorParameters = factoryParameters.Where((p) => !constructorParametersWithoutSelf.Contains(p))
+                                                            .ToArray();
             var injectedParameters = (from parameter in (IEnumerable<IParameterSymbol>)allConstructorParameters
                                       where !allContractMethodParameters.Any(contractMethodParameter => CompareParameters(contractMethodParameter, parameter))
                                       select parameter).ToArray();
 
             var factoryFieldsCodeSection = BuildFactoryImplementationFieldsCodeSection(injectedParameters);
             var factoryConstructorsCodeSection = this.BuildFactoryImplementationConstructorsCodeSection(factoryName, concreteClassDeclarationSyntax, injectedParameters);
-            var factoryMethodsCodeSection = this.BuildFactoryImplementationMethodsCodeSection(concreteClassTypeSymbol, injectedParameters, factoryInterfaceMethods);
+            var factoryMethodsCodeSection = this.BuildFactoryImplementationMethodsCodeSection(concreteClassTypeSymbol, injectedParameters, factoryInterfaceMethods, factoryInterfaceName);
 
             var code = @"#pragma warning disable 1591
 
