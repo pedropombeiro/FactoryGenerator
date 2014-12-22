@@ -1,6 +1,6 @@
 # FactoryGenerator #
 
-[![Build Status](https://travis-ci.org/minidfx/FactoryGenerator.svg)](https://travis-ci.org/minidfx/FactoryGenerator)
+[![Build Status](https://img.shields.io/travis/minidfx/FactoryGenerator.svg)](https://travis-ci.org/minidfx/FactoryGenerator)
 [![NuGet](https://img.shields.io/nuget/dt/DeveloperInTheFlow.FactoryGenerator.svg)](http://www.nuget.org/packages/DeveloperInTheFlow.FactoryGenerator/)
 
 
