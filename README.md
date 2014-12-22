@@ -1,8 +1,10 @@
 # FactoryGenerator #
 
 [![Build Status](https://travis-ci.org/minidfx/FactoryGenerator.svg)](https://travis-ci.org/minidfx/FactoryGenerator)
+[![NuGet](https://img.shields.io/nuget/dt/DeveloperInTheFlow.FactoryGenerator.svg)](http://www.nuget.org/packages/DeveloperInTheFlow.FactoryGenerator/)
 
-Tools for generating factories of your classes marked by the attribute GenerateFactory. It will generate a file at the same location than the class file with a suffix *.generated.cs*.
+
+Tools for generating factories of your classes marked by the attribute GenerateFactory. It will generate a file (&lt;TargetClass&gt;Factory.Generated.cs) at the same location than the class file.
 
 Add the attribute **GenerateFactory** on your class
 
