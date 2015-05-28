@@ -38,6 +38,9 @@
 
         private Solution solution;
 
+
+        private readonly string templatePath;
+
         #endregion
 
         #region Constructors and Destructors
@@ -46,12 +49,15 @@
         public FactoryGenerator(Workspace workspace,
                                 Solution solution,
                                 string[] attributeImportList,
-                                bool writeXmlDoc)
+                                bool writeXmlDoc,
+                                string templatePath)
         {
             this.workspace = workspace;
             this.solution = solution;
             this.attributeImportList = attributeImportList;
             this.writeXmlDoc = writeXmlDoc;
+            this.templatePath = templatePath;
+
         }
 
         #endregion

@@ -39,12 +39,13 @@
 
         private static async Task GenerateFactoriesAsync(string solutionPath,
                                                          string[] attributeImportList,
-                                                         bool writeXmlDoc)
+                                                         bool writeXmlDoc,
+                                                         string templatePath)
         {
             var workspace = MSBuildWorkspace.Create();
             var solution = await workspace.OpenSolutionAsync(solutionPath);
 
-            var factoryGenerator = new FactoryGenerator(workspace, solution, attributeImportList, writeXmlDoc);
+            var factoryGenerator = new FactoryGenerator(workspace, solution, attributeImportList, writeXmlDoc, templatePath);
 
             await factoryGenerator.ExecuteAsync();
         }
@@ -61,7 +62,8 @@
             {
                 GenerateFactoriesAsync(CommandLineOptions.SolutionPath,
                                        CommandLineOptions.AttributeImportList.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries),
-                                       CommandLineOptions.WriteXmlDoc)
+                                       CommandLineOptions.WriteXmlDoc,
+                                       CommandLineOptions.TemplatePath)
                     .Wait();
             }
             catch (AggregateException e)

@@ -22,6 +22,9 @@
         [Option('d', "doc", Required = false, HelpText = "Import XML documentation into generated factories", DefaultValue = false)]
         public bool WriteXmlDoc { get; set; }
 
+        [Option('t', "templatePath", Required = false, HelpText = "The path of the template that will be used for generating factories.", DefaultValue = "DefaultTemplate.render")]
+        public string TemplatePath { get; set; }
+
         #endregion
 
         #region Public Methods and Operators
