@@ -1,6 +1,7 @@
 ﻿namespace DeveloperInTheFlow.FactoryGenerator
 {
     using System;
+    using System.Collections.Generic;
     using System.Reflection;
     using System.Threading.Tasks;
 
@@ -38,7 +39,7 @@
         #region Methods
 
         private static async Task GenerateFactoriesAsync(string solutionPath,
-                                                         string[] attributeImportList,
+                                                         IEnumerable<string> attributeImportList,
                                                          bool writeXmlDoc,
                                                          string templatePath)
         {

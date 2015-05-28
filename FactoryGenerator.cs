@@ -33,8 +33,6 @@
 
         #region Fields
 
-        private readonly string[] attributeImportList;
-
         private readonly string version = FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).ProductVersion;
 
         private readonly Workspace workspace;
@@ -60,13 +58,12 @@
         [DebuggerStepThrough]
         public FactoryGenerator(Workspace workspace,
                                 Solution solution,
-                                string[] attributeImportList,
+                                IEnumerable<string> attributeImportList,
                                 bool writeXmlDoc,
                                 string templatePath)
         {
             this.workspace = workspace;
             this.solution = solution;
-            this.attributeImportList = attributeImportList;
             this.writeXmlDoc = writeXmlDoc;
             this.templatePath = templatePath;
 
@@ -489,7 +486,7 @@
             // Class attributes
             var classAttributes = new[]
                                   {
-                                      new Attribute("global::System.CodeDom.Compiler.GeneratedCode", new[] { new Argument("\"DeveloperInTheFlow.FactoryGenerator\""), new Argument("\"1.0\"") }),
+                                      new Attribute("global::System.CodeDom.Compiler.GeneratedCode", new[] { new Argument("\"DeveloperInTheFlow.FactoryGenerator\""), new Argument(string.Format("\"{0}\"", this.version)) }),
                                       new Attribute("global::System.Diagnostics.DebuggerNonUserCodeAttribute")
                                   };
 
