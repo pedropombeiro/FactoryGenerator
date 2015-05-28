@@ -45,6 +45,7 @@ namespace {{Namespace}}
 		#region Public Factory Methods
 		
 		{{#each Class.Methods}}
+{{&XmlDoc}}
 		public {{&ReturnType}} {{Name}}{{#GenericTypes}}<{{&GenericTypes}}>{{/GenericTypes}}({{^Arguments}}){{/Arguments}}
 		{{#each Arguments}}
 			{{&Value}}{{#if IsLast}}){{#else}}, {{/if}}

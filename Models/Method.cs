@@ -21,11 +21,13 @@
                       string newInstanceType,
                       IEnumerable<Argument> arguments,
                       IEnumerable<Argument> constructorArguments,
-                      IEnumerable<Argument> genericTypes)
+                      IEnumerable<Argument> genericTypes,
+                      string xmlDoc)
         {
             this.Name = name;
             this.ReturnType = returnType;
             this.NewInstanceType = newInstanceType;
+            this.XmlDoc = xmlDoc;
             this.Arguments = arguments.ToArray();
             this.ConstructorArguments = constructorArguments.ToArray();
             this.genericTypes = genericTypes;
@@ -64,6 +66,8 @@
         public string NewInstanceType { get; set; }
 
         public string ReturnType { get; private set; }
+
+        public string XmlDoc { get; set; }
 
         #endregion
     }

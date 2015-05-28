@@ -66,6 +66,15 @@
 // ReSharper disable once LoopCanBeConvertedToQuery
             foreach (var factoryMethod in factoryMethods)
             {
+                var documentationCommentXml = factoryMethod.GetDocumentationCommentXml();
+                var relevantLines = documentationCommentXml.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                                                           .SkipWhile(line => !line.StartsWith(" "))
+                                                           .TakeWhile(line => line != "</member>")
+                                                           .ToArray();
+                var indent = relevantLines.First().Length - relevantLines.First().TrimStart().Length;
+                var relevantLinesAsXmlDoc = relevantLines.Select(line => "        /// {0}".FormatWith(line.Substring(indent)));
+
+                var xmlComments = string.Join("\r\n", relevantLinesAsXmlDoc);
                 var constructor = GetConstructorFromFactoryMethod(factoryMethod, concreteClassSymbol);
                 var factoryMethodParameters = factoryMethod.Parameters;
 
@@ -73,7 +82,7 @@
                 var constructorArguments = constructor.Parameters.Select(x => new Argument(GetConstructorArgument(x, injectedParameters, factoryInterfaceName)));
                 var genericArguments = this.genericTypeBuilderService.Build(factoryMethod.TypeParameters);
 
-                methods.Add(new Method("Create", factoryMethod.ReturnType.ToString(), concreteClassSymbol.ToString(), arguments, constructorArguments, genericArguments));
+                methods.Add(new Method("Create", factoryMethod.ReturnType.ToString(), concreteClassSymbol.ToString(), arguments, constructorArguments, genericArguments, xmlComments));
             }
 
             return methods;
