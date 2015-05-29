@@ -22,7 +22,7 @@
         /// </returns>
         public IEnumerable<Argument> Build(IEnumerable<ITypeParameterSymbol> typeParameterSymbols)
         {
-            return typeParameterSymbols.Select(x => new Argument(x.Name));
+            return typeParameterSymbols.Select(x => new Argument(x.Name, x.Name));
         }
 
         #endregion

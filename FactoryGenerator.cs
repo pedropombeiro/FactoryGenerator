@@ -486,7 +486,7 @@
             // Class attributes
             var classAttributes = new[]
                                   {
-                                      new Attribute("global::System.CodeDom.Compiler.GeneratedCode", new[] { new Argument("\"DeveloperInTheFlow.FactoryGenerator\""), new Argument(string.Format("\"{0}\"", this.version)) }),
+                                      new Attribute("global::System.CodeDom.Compiler.GeneratedCode", new[] { new Argument("\"DeveloperInTheFlow.FactoryGenerator\"", string.Empty), new Argument(string.Format("\"{0}\"", this.version), string.Empty) }),
                                       new Attribute("global::System.Diagnostics.DebuggerNonUserCodeAttribute")
                                   };
 
@@ -496,11 +496,11 @@
             // Constructor of the factory
             var constructor = this.constructorBuilderService.Build(concreteClassDeclarationSyntax, injectedParameters);
 
-            // Methods of the factory
-            var methods = this.methodsBuilderService.Build(concreteClassTypeSymbol, injectedParameters, factoryInterfaceMethods, factoryInterfaceName);
-
             // Fields of the factory
-            var fields = this.fieldsBuilderService.Build(injectedParameters);
+            var fields = this.fieldsBuilderService.Build(injectedParameters).ToArray();
+
+            // Methods of the factory
+            var methods = this.methodsBuilderService.Build(concreteClassTypeSymbol, fields, injectedParameters, factoryInterfaceMethods, factoryInterfaceName);
 
             // Interface of the factory
             var inherit = factoryInterfaceTypeSymbol.ToString();

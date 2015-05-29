@@ -39,6 +39,9 @@
         /// <param name="concreteClassSymbol">
         ///     Represents the concrete class.
         /// </param>
+        /// <param name="fields">
+        ///     Fields available in the factory.
+        /// </param>
         /// <param name="injectedParameters">
         ///     The injected parameters in the factory.
         /// </param>
@@ -52,6 +55,7 @@
         ///     Models representing the factory methods.
         /// </returns>
         public IEnumerable<Method> Build(INamedTypeSymbol concreteClassSymbol,
+                                         IEnumerable<Field> fields,
                                          IParameterSymbol[] injectedParameters,
                                          IMethodSymbol[] factoryMethods,
                                          string factoryInterfaceName)
@@ -61,25 +65,19 @@
                 return Enumerable.Empty<Method>();
             }
 
+            fields = fields as Field[] ?? fields.ToArray();
             var methods = new List<Method>();
 
 // ReSharper disable once LoopCanBeConvertedToQuery
             foreach (var factoryMethod in factoryMethods)
             {
-                var documentationCommentXml = factoryMethod.GetDocumentationCommentXml();
-                var relevantLines = documentationCommentXml.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                                                           .SkipWhile(line => !line.StartsWith(" "))
-                                                           .TakeWhile(line => line != "</member>")
-                                                           .ToArray();
-                var indent = relevantLines.First().Length - relevantLines.First().TrimStart().Length;
-                var relevantLinesAsXmlDoc = relevantLines.Select(line => "        /// {0}".FormatWith(line.Substring(indent)));
-
-                var xmlComments = string.Join("\r\n", relevantLinesAsXmlDoc);
                 var constructor = GetConstructorFromFactoryMethod(factoryMethod, concreteClassSymbol);
                 var factoryMethodParameters = factoryMethod.Parameters;
 
-                var arguments = factoryMethodParameters.Select(x => new Argument(BuildArgument(x)));
-                var constructorArguments = constructor.Parameters.Select(x => new Argument(GetConstructorArgument(x, injectedParameters, factoryInterfaceName)));
+                var xmlComments = BuildXmlDoc(factoryMethod);
+                var arguments = factoryMethodParameters.Select(x => new Argument(BuildArgument(x), x.Name))
+                                                       .ToArray();
+                var constructorArguments = BuildConstructorArguments(constructor, arguments, fields, injectedParameters, factoryInterfaceName);
                 var genericArguments = this.genericTypeBuilderService.Build(factoryMethod.TypeParameters);
 
                 methods.Add(new Method("Create", factoryMethod.ReturnType.ToString(), concreteClassSymbol.ToString(), arguments, constructorArguments, genericArguments, xmlComments));
@@ -102,6 +100,30 @@
             return attributes.Any()
                        ? string.Format("[{0}] ", string.Join(",", attributes.Select(x => x.ToString())))
                        : string.Empty;
+        }
+
+        private static IEnumerable<Argument> BuildConstructorArguments(IMethodSymbol constructor,
+                                                                       IEnumerable<Argument> methodArguments,
+                                                                       IEnumerable<Field> parameters,
+                                                                       IEnumerable<IParameterSymbol> injectedParameters,
+                                                                       string factoryInterfaceName)
+        {
+            return constructor.Parameters
+                              .Where(x => parameters.Any(f => f.Name == x.Name) || methodArguments.Any(a => a.Name == x.Name) || x.Type.Name == factoryInterfaceName)
+                              .Select(x => new Argument(GetConstructorArgument(x, injectedParameters, factoryInterfaceName), x.Name));
+        }
+
+        private static string BuildXmlDoc(ISymbol factoryMethod)
+        {
+            var documentationCommentXml = factoryMethod.GetDocumentationCommentXml();
+            var relevantLines = documentationCommentXml.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                                                       .SkipWhile(line => !line.StartsWith(" "))
+                                                       .TakeWhile(line => line != "</member>")
+                                                       .ToArray();
+            var indent = relevantLines.First().Length - relevantLines.First().TrimStart().Length;
+            var relevantLinesAsXmlDoc = relevantLines.Select(line => "        /// {0}".FormatWith(line.Substring(indent)));
+
+            return string.Join("\r\n", relevantLinesAsXmlDoc);
         }
 
         private static string GetConstructorArgument(IParameterSymbol parameterSymbol,
