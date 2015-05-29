@@ -84,7 +84,7 @@
                 var constructor = GetConstructorFromFactoryMethod(factoryMethod, concreteClassSymbol);
                 var factoryMethodParameters = factoryMethod.Parameters;
 
-                var arguments = this.argumentsBuilderService.Build(factoryMethodParameters)
+                var arguments = this.argumentsBuilderService.BuildMethodArgument(factoryMethodParameters)
                                     .ToArray();
                 var constructorArguments = this.BuildConstructorArguments(constructor, arguments, fields, injectedParameters, factoryInterfaceName);
                 var genericArguments = this.genericTypeBuilderService.Build(factoryMethod.TypeParameters);

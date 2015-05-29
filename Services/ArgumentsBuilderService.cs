@@ -16,7 +16,7 @@
         #region Public Methods and Operators
 
         /// <summary>
-        ///     Builds <see cref="Argument"/> models.
+        ///     Builds <see cref="Argument"/> models for a factory constructor.
         /// </summary>
         /// <param name="parameterSymbols">
         ///     The parameter representing an argument from Roslyn.
@@ -24,9 +24,25 @@
         /// <returns>
         ///     The argument models.
         /// </returns>
-        public IEnumerable<Argument> Build(IEnumerable<IParameterSymbol> parameterSymbols)
+        public IEnumerable<Argument> BuildConstructorArgument(IEnumerable<IParameterSymbol> parameterSymbols)
         {
-            var arguments = parameterSymbols.Select(BuildArgument);
+            var arguments = parameterSymbols.Select(x => BuildArgument(x, true));
+
+            return this.SetLastArgument(arguments);
+        }
+
+        /// <summary>
+        ///     Builds <see cref="Argument"/> models for a factory methods.
+        /// </summary>
+        /// <param name="parameterSymbols">
+        ///     The parameter representing an argument from Roslyn.
+        /// </param>
+        /// <returns>
+        ///     The argument models.
+        /// </returns>
+        public IEnumerable<Argument> BuildMethodArgument(IEnumerable<IParameterSymbol> parameterSymbols)
+        {
+            var arguments = parameterSymbols.Select(x => BuildArgument(x, false));
 
             return this.SetLastArgument(arguments);
         }
@@ -78,27 +94,32 @@
 
         #region Methods
 
-        private static Argument BuildArgument(IParameterSymbol parameterSymbol)
+        private static Argument BuildArgument(IParameterSymbol parameterSymbol,
+                                              bool shortArgument)
         {
-            return new Argument(BuildArgumentValue(parameterSymbol), parameterSymbol.Name);
-        }
-
-        private static string BuildArgumentValue(IParameterSymbol parameterSymbol)
-        {
-            if (parameterSymbol.DeclaringSyntaxReferences.Any())
-            {
-                return parameterSymbol.DeclaringSyntaxReferences[0].GetSyntax().ToString();
-            }
-
-            return string.Format("{0}{1} {2}", BuildAttributes(parameterSymbol.GetAttributes()),
-                                 parameterSymbol.Type,
-                                 parameterSymbol.Name);
+            return new Argument(shortArgument
+                                    ? BuildShortArgumentValue(parameterSymbol)
+                                    : BuildLongArgumentValue(parameterSymbol), parameterSymbol.Name);
         }
 
         private static string BuildAttributes(ImmutableArray<AttributeData> attributes)
         {
             return attributes.Any()
                        ? string.Format("[{0}] ", string.Join(",", attributes.Select(x => x.ToString())))
+                       : string.Empty;
+        }
+
+        private static string BuildLongArgumentValue(IParameterSymbol parameterSymbol)
+        {
+            return string.Format("{0}{1} {2}", BuildAttributes(parameterSymbol.GetAttributes()),
+                                 parameterSymbol.Type,
+                                 parameterSymbol.Name);
+        }
+
+        private static string BuildShortArgumentValue(ISymbol parameterSymbol)
+        {
+            return parameterSymbol.DeclaringSyntaxReferences.Any()
+                       ? parameterSymbol.DeclaringSyntaxReferences[0].GetSyntax().ToString()
                        : string.Empty;
         }
 

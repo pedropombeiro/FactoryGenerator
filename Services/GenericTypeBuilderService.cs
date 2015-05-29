@@ -28,6 +28,15 @@
             return typeParameterSymbols.Select(x => new Argument(x.Name, x.Name));
         }
 
+        /// <summary>
+        ///     Builds a string representing generic types.
+        /// </summary>
+        /// <param name="typeParameterSymbols">
+        ///     The <see cref="Enumerable"/> of the generic type as parameters.
+        /// </param>
+        /// <returns>
+        ///     A string representing generic types.
+        /// </returns>
         public string BuildString(IEnumerable<ITypeParameterSymbol> typeParameterSymbols)
         {
             var parameterSymbols = typeParameterSymbols as ITypeParameterSymbol[] ?? typeParameterSymbols.ToArray();

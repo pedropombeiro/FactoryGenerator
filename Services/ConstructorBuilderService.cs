@@ -69,7 +69,7 @@ namespace DeveloperInTheFlow.FactoryGenerator.Services
                                                                                }).ToArray();
 
             var constructorAttributes = new List<Attribute>(importedConstructorAttributes.Select(x => new Attribute(x.ToString())));
-            var constructorArguments = this.argumentsBuilderService.Build(parameterSymbols);
+            var constructorArguments = this.argumentsBuilderService.BuildConstructorArgument(parameterSymbols);
 
             return new Constructor(constructorArguments, constructorAttributes);
         }
