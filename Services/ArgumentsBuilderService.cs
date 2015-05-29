@@ -35,18 +35,22 @@
         ///     Builds a single <see cref="Argument"/>.
         /// </summary>
         /// <param name="value">
-        ///     The value of the argument.
+        ///   The value of the argument.
         /// </param>
         /// <param name="parameterSymbol">
-        ///     The parameter representing an argument from Roslyn.
+        ///   The parameter representing an argument from Roslyn.
+        /// </param>
+        /// <param name="isInjected">
+        ///     Determines whether the argument was injected by the factory constructor.
         /// </param>
         /// <returns>
         ///     The argument model.
         /// </returns>
         public Argument BuildSingle(string value,
-                                    IParameterSymbol parameterSymbol)
+                                    IParameterSymbol parameterSymbol,
+                                    bool isInjected)
         {
-            return new Argument(value, parameterSymbol.Name);
+            return new Argument(value, parameterSymbol.Name, isInjected);
         }
 
         /// <summary>

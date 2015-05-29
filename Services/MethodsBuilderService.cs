@@ -170,9 +170,11 @@
                                                                 IEnumerable<IParameterSymbol> injectedParameters,
                                                                 string factoryInterfaceName)
         {
+            var injectedParameterSymbols = injectedParameters as IParameterSymbol[] ?? injectedParameters.ToArray();
+
             var arguments = constructor.Parameters
                                        .Where(x => parameters.Any(f => f.Name == x.Name) || methodArguments.Any(a => a.Name == x.Name) || x.Type.Name == factoryInterfaceName)
-                                       .Select(x => this.argumentsBuilderService.BuildSingle(GetConstructorArgument(x, injectedParameters, factoryInterfaceName), x));
+                                       .Select(x => this.argumentsBuilderService.BuildSingle(GetConstructorArgument(x, injectedParameterSymbols, factoryInterfaceName), x, injectedParameterSymbols.Any(p => p.Name == x.Name)));
 
             // Give the responsability to the argument service
             return this.argumentsBuilderService.SetLastArgument(arguments);
