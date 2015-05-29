@@ -33,6 +33,16 @@
 
         #region Fields
 
+        private readonly ConstructorBuilderService constructorBuilderService;
+
+        private readonly FieldsBuilderService fieldsBuilderService;
+
+        private readonly GenericTypeBuilderService genericTypeBuilderService;
+
+        private readonly MethodsBuilderService methodsBuilderService;
+
+        private readonly string templatePath;
+
         private readonly string version = FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).ProductVersion;
 
         private readonly Workspace workspace;
@@ -40,16 +50,6 @@
         private readonly bool writeXmlDoc;
 
         private Solution solution;
-
-        private readonly FieldsBuilderService fieldsBuilderService;
-
-        private readonly ConstructorBuilderService constructorBuilderService;
-
-        private readonly MethodsBuilderService methodsBuilderService;
-
-        private readonly GenericTypeBuilderService genericTypeBuilderService;
-
-        private readonly string templatePath;
 
         #endregion
 
@@ -462,7 +462,6 @@
             var outerUsingDeclarations = FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<CompilationUnitSyntax>().Usings, usingsToFilterOut);
             var innerUsingDeclarations = FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<NamespaceDeclarationSyntax>().Usings, usingsToFilterOut);
 
-
             var factoryInterfaceMethods = GetSuitableFactoryInterfaceMethods(concreteClassTypeSymbol, factoryInterfaceTypeSymbol);
 
             var allContractMethodParameters = factoryInterfaceMethods.SelectMany(contractTypeMethod => contractTypeMethod.Parameters).ToArray();
@@ -510,9 +509,9 @@
 
             // The file containing the factory
             var factoryFile = new FactoryFile(@namespace,
-                factoryClass,
-                innerUsingDeclarations.ToFullString(),
-                outerUsingDeclarations.ToFullString());
+                                              factoryClass,
+                                              innerUsingDeclarations.ToFullString(),
+                                              outerUsingDeclarations.ToFullString());
 
             // The result of the generator
             var factoryResult = factoryGeneratorEngine.Generate(fileName, typeDeclarationDocument.Folders, factoryFile);
@@ -544,7 +543,7 @@
 
         private class ParameterEqualityComparer : IEqualityComparer<IParameterSymbol>
         {
-             #region Public Methods and Operators
+            #region Public Methods and Operators
 
             /// <summary>
             /// Determines whether the specified objects are equal.
