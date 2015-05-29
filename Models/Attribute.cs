@@ -23,13 +23,6 @@
             : this(name)
         {
             this.Arguments = arguments;
-
-            // Search and set the last argument
-            var lastArgument = this.Arguments.LastOrDefault();
-            if (lastArgument != null)
-            {
-                lastArgument.IsLast = true;
-            }
         }
 
         #endregion

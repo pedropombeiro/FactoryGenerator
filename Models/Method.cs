@@ -31,18 +31,6 @@
             this.Arguments = arguments.ToArray();
             this.ConstructorArguments = constructorArguments.ToArray();
             this.genericTypes = genericTypes;
-
-            var lastArgument = this.Arguments.LastOrDefault();
-            if (lastArgument != null)
-            {
-                lastArgument.IsLast = true;
-            }
-
-            var lastConstructorArgument = this.ConstructorArguments.LastOrDefault();
-            if (lastConstructorArgument != null)
-            {
-                lastConstructorArgument.IsLast = true;
-            }
         }
 
         #endregion

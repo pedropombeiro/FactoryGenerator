@@ -15,6 +15,8 @@ namespace DeveloperInTheFlow.FactoryGenerator.Services
     {
         #region Fields
 
+        private readonly ArgumentsBuilderService argumentsBuilderService;
+
         private readonly IEnumerable<string> attributeImportList;
 
         #endregion
@@ -24,9 +26,11 @@ namespace DeveloperInTheFlow.FactoryGenerator.Services
         /// <summary>
         ///     Initializes a new instance of the <see cref="ConstructorBuilderService"/> class.
         /// </summary>
-        public ConstructorBuilderService(IEnumerable<string> attributeImportList)
+        public ConstructorBuilderService(IEnumerable<string> attributeImportList,
+                                         ArgumentsBuilderService argumentsBuilderService)
         {
             this.attributeImportList = attributeImportList;
+            this.argumentsBuilderService = argumentsBuilderService;
         }
 
         #endregion
@@ -65,7 +69,7 @@ namespace DeveloperInTheFlow.FactoryGenerator.Services
                                                                                }).ToArray();
 
             var constructorAttributes = new List<Attribute>(importedConstructorAttributes.Select(x => new Attribute(x.ToString())));
-            var constructorArguments = new List<Argument>(parameterSymbols.Select(x => new Argument(x.DeclaringSyntaxReferences[0].GetSyntax().ToString(), x.Name)));
+            var constructorArguments = this.argumentsBuilderService.Build(parameterSymbols);
 
             return new Constructor(constructorArguments, constructorAttributes);
         }

@@ -15,12 +15,6 @@
         {
             this.Arguments = arguments;
             this.Attributes = attributes;
-
-            var lastArgument = this.Arguments.LastOrDefault();
-            if (lastArgument != null)
-            {
-                lastArgument.IsLast = true;
-            }
         }
 
         #endregion

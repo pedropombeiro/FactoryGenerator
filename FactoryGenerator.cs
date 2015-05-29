@@ -33,6 +33,8 @@
 
         #region Fields
 
+        private readonly ArgumentsBuilderService argumentBuilderService;
+
         private readonly ConstructorBuilderService constructorBuilderService;
 
         private readonly FieldsBuilderService fieldsBuilderService;
@@ -68,9 +70,10 @@
             this.templatePath = templatePath;
 
             this.fieldsBuilderService = new FieldsBuilderService();
-            this.constructorBuilderService = new ConstructorBuilderService(attributeImportList);
             this.genericTypeBuilderService = new GenericTypeBuilderService();
-            this.methodsBuilderService = new MethodsBuilderService(this.genericTypeBuilderService);
+            this.argumentBuilderService = new ArgumentsBuilderService();
+            this.constructorBuilderService = new ConstructorBuilderService(attributeImportList, this.argumentBuilderService);
+            this.methodsBuilderService = new MethodsBuilderService(this.genericTypeBuilderService, this.argumentBuilderService, writeXmlDoc);
         }
 
         #endregion
@@ -482,10 +485,12 @@
             var concreteClassName = GetXmlDocSafeTypeName(concreteClassTypeSymbol.ToString());
             var @namespace = GetDeclarationNamespaceFullName(concreteClassDeclarationSyntax);
 
+            var generateCodeArguments = this.argumentBuilderService.SetLastArgument(new[] { new Argument("\"DeveloperInTheFlow.FactoryGenerator\"", string.Empty), new Argument(string.Format("\"{0}\"", this.version), string.Empty) });
+
             // Class attributes
             var classAttributes = new[]
                                   {
-                                      new Attribute("global::System.CodeDom.Compiler.GeneratedCode", new[] { new Argument("\"DeveloperInTheFlow.FactoryGenerator\"", string.Empty), new Argument(string.Format("\"{0}\"", this.version), string.Empty) }),
+                                      new Attribute("global::System.CodeDom.Compiler.GeneratedCode", generateCodeArguments),
                                       new Attribute("global::System.Diagnostics.DebuggerNonUserCodeAttribute")
                                   };
 

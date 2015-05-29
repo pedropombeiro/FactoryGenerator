@@ -28,6 +28,14 @@
             return typeParameterSymbols.Select(x => new Argument(x.Name, x.Name));
         }
 
+        public string BuildString(IEnumerable<ITypeParameterSymbol> typeParameterSymbols)
+        {
+            var parameterSymbols = typeParameterSymbols as ITypeParameterSymbol[] ?? typeParameterSymbols.ToArray();
+            return parameterSymbols.Any()
+                       ? string.Format("<{0}>", string.Join(",", parameterSymbols.Select(x => x.Name)))
+                       : string.Empty;
+        }
+
         #endregion
     }
 }

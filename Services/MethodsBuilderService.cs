@@ -2,7 +2,6 @@
 {
     using System;
     using System.Collections.Generic;
-    using System.Collections.Immutable;
     using System.Linq;
 
     using DeveloperInTheFlow.FactoryGenerator.Models;
@@ -18,7 +17,11 @@
     {
         #region Fields
 
+        private readonly ArgumentsBuilderService argumentsBuilderService;
+
         private readonly GenericTypeBuilderService genericTypeBuilderService;
+
+        private readonly bool writeXmlDoc;
 
         #endregion
 
@@ -27,9 +30,13 @@
         /// <summary>
         ///     Initializes a new instance of the <see cref="MethodsBuilderService"/> class.
         /// </summary>
-        public MethodsBuilderService(GenericTypeBuilderService genericTypeBuilderService)
+        public MethodsBuilderService(GenericTypeBuilderService genericTypeBuilderService,
+                                     ArgumentsBuilderService argumentsBuilderService,
+                                     bool writeXmlDoc)
         {
             this.genericTypeBuilderService = genericTypeBuilderService;
+            this.argumentsBuilderService = argumentsBuilderService;
+            this.writeXmlDoc = writeXmlDoc;
         }
 
         #endregion
@@ -77,13 +84,20 @@
                 var constructor = GetConstructorFromFactoryMethod(factoryMethod, concreteClassSymbol);
                 var factoryMethodParameters = factoryMethod.Parameters;
 
-                var xmlComments = BuildXmlDoc(factoryMethod);
-                var arguments = factoryMethodParameters.Select(x => new Argument(BuildArgument(x), x.Name))
-                                                       .ToArray();
-                var constructorArguments = BuildConstructorArguments(constructor, arguments, fields, injectedParameters, factoryInterfaceName);
+                var arguments = this.argumentsBuilderService.Build(factoryMethodParameters)
+                                    .ToArray();
+                var constructorArguments = this.BuildConstructorArguments(constructor, arguments, fields, injectedParameters, factoryInterfaceName);
                 var genericArguments = this.genericTypeBuilderService.Build(factoryMethod.TypeParameters);
 
-                methods.Add(new Method("Create", factoryMethod.ReturnType.ToString(), concreteClassSymbol.ToString(), arguments, constructorArguments, genericArguments, xmlComments));
+                if (this.writeXmlDoc)
+                {
+                    var xmlComments = BuildXmlDoc(factoryMethod);
+                    methods.Add(new Method("Create", factoryMethod.ReturnType.ToString(), concreteClassSymbol.ToString(), arguments, constructorArguments, genericArguments, xmlComments));
+                }
+                else
+                {
+                    methods.Add(new Method("Create", factoryMethod.ReturnType.ToString(), concreteClassSymbol.ToString(), arguments, constructorArguments, genericArguments, string.Empty));
+                }
             }
 
             return methods;
@@ -92,29 +106,6 @@
         #endregion
 
         #region Methods
-
-        private static string BuildArgument(IParameterSymbol parameterSymbol)
-        {
-            return string.Format("{0}{1} {2}", BuildAttributes(parameterSymbol.GetAttributes()), parameterSymbol.Type, parameterSymbol.Name);
-        }
-
-        private static string BuildAttributes(ImmutableArray<AttributeData> attributes)
-        {
-            return attributes.Any()
-                       ? string.Format("[{0}] ", string.Join(",", attributes.Select(x => x.ToString())))
-                       : string.Empty;
-        }
-
-        private static IEnumerable<Argument> BuildConstructorArguments(IMethodSymbol constructor,
-                                                                       IEnumerable<Argument> methodArguments,
-                                                                       IEnumerable<Field> parameters,
-                                                                       IEnumerable<IParameterSymbol> injectedParameters,
-                                                                       string factoryInterfaceName)
-        {
-            return constructor.Parameters
-                              .Where(x => parameters.Any(f => f.Name == x.Name) || methodArguments.Any(a => a.Name == x.Name) || x.Type.Name == factoryInterfaceName)
-                              .Select(x => new Argument(GetConstructorArgument(x, injectedParameters, factoryInterfaceName), x.Name));
-        }
 
         private static string BuildXmlDoc(ISymbol factoryMethod)
         {
@@ -171,6 +162,20 @@
             {
                 throw new InvalidOperationException("Could not select a constructor from {0} type with the following parameters: ({1}).".FormatWith(concreteClassSymbol.Name, string.Join(", ", factoryMethodParameters.Select(x => x.Name))), e);
             }
+        }
+
+        private IEnumerable<Argument> BuildConstructorArguments(IMethodSymbol constructor,
+                                                                IEnumerable<Argument> methodArguments,
+                                                                IEnumerable<Field> parameters,
+                                                                IEnumerable<IParameterSymbol> injectedParameters,
+                                                                string factoryInterfaceName)
+        {
+            var arguments = constructor.Parameters
+                                       .Where(x => parameters.Any(f => f.Name == x.Name) || methodArguments.Any(a => a.Name == x.Name) || x.Type.Name == factoryInterfaceName)
+                                       .Select(x => this.argumentsBuilderService.BuildSingle(GetConstructorArgument(x, injectedParameters, factoryInterfaceName), x));
+
+            // Give the responsability to the argument service
+            return this.argumentsBuilderService.SetLastArgument(arguments);
         }
 
         #endregion
