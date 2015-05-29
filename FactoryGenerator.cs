@@ -49,8 +49,6 @@
 
         private readonly Workspace workspace;
 
-        private readonly bool writeXmlDoc;
-
         private Solution solution;
 
         #endregion
@@ -66,7 +64,6 @@
         {
             this.workspace = workspace;
             this.solution = solution;
-            this.writeXmlDoc = writeXmlDoc;
             this.templatePath = templatePath;
 
             this.fieldsBuilderService = new FieldsBuilderService();
