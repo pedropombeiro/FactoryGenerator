@@ -4,6 +4,9 @@
 
     using Microsoft.CodeAnalysis.CSharp.Syntax;
 
+    /// <summary>
+    ///     Service responsible for formatting the name of the factory.
+    /// </summary>
     public class FactoryFormatterNameService
     {
         #region Public Methods and Operators

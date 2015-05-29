@@ -7,6 +7,9 @@
 
     using Microsoft.CodeAnalysis;
 
+    /// <summary>
+    ///     Service responsible for building the generic type models.
+    /// </summary>
     public class GenericTypeBuilderService
     {
         #region Public Methods and Operators

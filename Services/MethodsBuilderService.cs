@@ -11,6 +11,9 @@
 
     using Microsoft.CodeAnalysis;
 
+    /// <summary>
+    ///     Service responsible for building method models.
+    /// </summary>
     public class MethodsBuilderService
     {
         #region Fields

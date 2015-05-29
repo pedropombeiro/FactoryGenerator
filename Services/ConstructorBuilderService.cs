@@ -8,6 +8,9 @@ namespace DeveloperInTheFlow.FactoryGenerator.Services
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
 
+    /// <summary>
+    ///     Service responsible for building the <see cref="Constructor"/> model.
+    /// </summary>
     public class ConstructorBuilderService
     {
         #region Fields

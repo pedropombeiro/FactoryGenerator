@@ -8,6 +8,9 @@
 
     using Nustache.Core;
 
+    /// <summary>
+    ///     Service responsible for building the factory <see cref="Document"/>.
+    /// </summary>
     public class FactoryGeneratorEngine
     {
         #region Fields

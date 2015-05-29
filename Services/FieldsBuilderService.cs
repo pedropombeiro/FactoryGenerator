@@ -7,6 +7,9 @@
 
     using Microsoft.CodeAnalysis;
 
+    /// <summary>
+    ///     Service responsible for building field models.
+    /// </summary>
     public class FieldsBuilderService
     {
         #region Public Methods and Operators
