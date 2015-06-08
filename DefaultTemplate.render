@@ -11,7 +11,7 @@ namespace {{Namespace}}
     ///		The implementation for the factory generating <see cref="{{Class.ConcreteClassName}}" /> instances.
     /// </summary>
 {{#each Class.Attributes}}
-	[{{Name}}{{#if Arguments}}({{#each Arguments}}{{&Value}}{{^IsLast}}, {{/IsLast}}{{/each}}){{/if}}]
+	[{{Name}}{{#if Arguments}}({{#each Arguments}}{{&Text}}{{^IsLast}}, {{/IsLast}}{{/each}}){{/if}}]
 {{/each}}
     public partial class {{Class.Name}}{{#Class.GenericTypes}}<{{&Class.GenericTypes}}>{{/Class.GenericTypes}} : {{&Class.Inherit}}
     {
@@ -30,7 +30,7 @@ namespace {{Namespace}}
 
 		public {{Class.Name}} (
 		{{#each Class.Constructor.Arguments}}
-			{{&Value}}{{#if IsLast}}){{#else}}, {{/if}}
+			{{&Attribute}} {{&Type}} {{Name}}{{#if IsLast}}){{#else}}, {{/if}}
 		{{/each}}
 		{
 			{{#each Class.Fields}}
@@ -43,16 +43,18 @@ namespace {{Namespace}}
 		{{/if}}
 		{{#if Class.Methods}}
 		#region Public Factory Methods
-		
+
 		{{#each Class.Methods}}
+{{#if XmlDoc}}
 {{&XmlDoc}}
+{{/if}}
 		public {{&ReturnType}} {{Name}}{{#GenericTypes}}<{{&GenericTypes}}>{{/GenericTypes}}({{^Arguments}}){{/Arguments}}
 		{{#each Arguments}}
-			{{&Value}}{{#if IsLast}}){{#else}}, {{/if}}
+			 {{&Attribute}} {{&Type}} {{Name}}{{#if IsLast}}){{#else}}, {{/if}}
 		{{/each}}
 		{
-			return new {{&NewInstanceType}}({{^ConstructorArguments}});{{/ConstructorArguments}}
-				{{#each ConstructorArguments}}
+			return new {{&NewInstanceType}} ({{^ImplementationParameters}});{{/ImplementationParameters}}
+				{{#each ImplementationParameters}}
 					{{&Value}}{{#if IsLast}});{{#else}}, {{/if}}
 				{{/each}}
 		}
