@@ -57,7 +57,7 @@
             var attributes = parameterSymbol.GetAttributes();
 
             return attributes.Any()
-                       ? string.Format("[{0}] ", string.Join(",", attributes.Select(x => x.ToString())))
+                       ? string.Format("[{0}]", string.Join(",", attributes.Select(x => x.ToString())))
                        : string.Empty;
         }
 
