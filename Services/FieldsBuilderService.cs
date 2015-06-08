@@ -47,7 +47,7 @@
             return !parameterSymbols.Any()
                        ? Enumerable.Empty<Field>()
                        : parameterSymbols.Select(x => new Field(x.Name,
-                                                                x.Type.ToString(),
+                                                                this.parameterSymbolBuilderService.BuildArgumentType(x, true),
                                                                 this.parameterSymbolBuilderService.DeterminesIfValueType(x.Type)));
         }
 
