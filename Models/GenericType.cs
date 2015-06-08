@@ -5,14 +5,14 @@
         #region Constructors and Destructors
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="GenericType"/> class.
+        ///     Initializes a new instance of the <see cref="GenericType"/> class.
         /// </summary>
         public GenericType(string name)
         {
             this.Name = name;
         }
 
-        #endregion                                                            s
+        #endregion
 
         #region Public Properties
 
