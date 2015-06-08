@@ -33,8 +33,6 @@
 
         #region Fields
 
-        private readonly ArgumentsBuilderService argumentBuilderService;
-
         private readonly ConstructorBuilderService constructorBuilderService;
 
         private readonly FieldsBuilderService fieldsBuilderService;
@@ -66,11 +64,13 @@
             this.solution = solution;
             this.templatePath = templatePath;
 
-            this.fieldsBuilderService = new FieldsBuilderService();
+            var parameterSymbolService = new ParameterSymbolBuilderService();
+            var argumentBuilderService = new ArgumentsBuilderService(parameterSymbolService);
+
+            this.fieldsBuilderService = new FieldsBuilderService(parameterSymbolService);
             this.genericTypeBuilderService = new GenericTypeBuilderService();
-            this.argumentBuilderService = new ArgumentsBuilderService();
-            this.constructorBuilderService = new ConstructorBuilderService(attributeImportList, this.argumentBuilderService);
-            this.methodsBuilderService = new MethodsBuilderService(this.genericTypeBuilderService, this.argumentBuilderService, writeXmlDoc);
+            this.constructorBuilderService = new ConstructorBuilderService(attributeImportList, argumentBuilderService);
+            this.methodsBuilderService = new MethodsBuilderService(this.genericTypeBuilderService, argumentBuilderService, parameterSymbolService, writeXmlDoc);
         }
 
         #endregion
@@ -368,7 +368,6 @@
                                   .Where(IsTypeDeclarationSyntaxFactoryTarget)
                                   .ToArray();
 
-                // new SyntaxWalker().Visit(syntaxRootNode);
                 if (classDeclarations.Any())
                 {
                     foreach (var classDeclarationSyntax in classDeclarations)
@@ -482,7 +481,7 @@
             var concreteClassName = GetXmlDocSafeTypeName(concreteClassTypeSymbol.ToString());
             var @namespace = GetDeclarationNamespaceFullName(concreteClassDeclarationSyntax);
 
-            var generateCodeArguments = this.argumentBuilderService.SetLastArgument(new[] { new Argument("\"DeveloperInTheFlow.FactoryGenerator\"", string.Empty), new Argument(string.Format("\"{0}\"", this.version), string.Empty) });
+            var generateCodeArguments = new[] { new Value("\"DeveloperInTheFlow.FactoryGenerator\"", false), new Value(string.Format("\"{0}\"", this.version), true) };
 
             // Class attributes
             var classAttributes = new[]

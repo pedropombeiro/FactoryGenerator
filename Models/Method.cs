@@ -7,7 +7,7 @@
     {
         #region Fields
 
-        private readonly IEnumerable<Argument> genericTypes;
+        private readonly IEnumerable<GenericType> genericTypes;
 
         #endregion
 
@@ -20,8 +20,8 @@
                       string returnType,
                       string newInstanceType,
                       IEnumerable<Argument> arguments,
-                      IEnumerable<Argument> constructorArguments,
-                      IEnumerable<Argument> genericTypes,
+                      IEnumerable<Parameter> implementationParameters,
+                      IEnumerable<GenericType> genericTypes,
                       string xmlDoc)
         {
             this.Name = name;
@@ -29,8 +29,14 @@
             this.NewInstanceType = newInstanceType;
             this.XmlDoc = xmlDoc;
             this.Arguments = arguments.ToArray();
-            this.ConstructorArguments = constructorArguments.ToArray();
+            this.ImplementationParameters = implementationParameters.ToArray();
             this.genericTypes = genericTypes;
+
+            var lastParameter = this.ImplementationParameters.LastOrDefault();
+            if (lastParameter != null)
+            {
+                lastParameter.IsLast = true;
+            }
         }
 
         #endregion
@@ -39,15 +45,15 @@
 
         public IEnumerable<Argument> Arguments { get; private set; }
 
-        public IEnumerable<Argument> ConstructorArguments { get; private set; }
-
         public string GenericTypes
         {
             get
             {
-                return string.Join(",", this.genericTypes.Select(x => x.Value));
+                return string.Join(",", this.genericTypes.Select(x => x.Name));
             }
         }
+
+        public IEnumerable<Parameter> ImplementationParameters { get; private set; }
 
         public string Name { get; private set; }
 

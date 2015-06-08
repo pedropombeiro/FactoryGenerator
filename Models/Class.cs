@@ -7,7 +7,7 @@
     {
         #region Fields
 
-        private readonly IEnumerable<Argument> genericTypes;
+        private readonly IEnumerable<GenericType> genericTypes;
 
         #endregion
 
@@ -21,7 +21,7 @@
                      Constructor constructor,
                      IEnumerable<Method> methods,
                      IEnumerable<Field> fields,
-                     IEnumerable<Argument> genericTypes,
+                     IEnumerable<GenericType> genericTypes,
                      string inherit,
                      string name)
         {
@@ -51,7 +51,7 @@
         {
             get
             {
-                return string.Join(",", this.genericTypes.Select(x => x.Value));
+                return string.Join(",", this.genericTypes.Select(x => x.Name));
             }
         }
 

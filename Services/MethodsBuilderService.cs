@@ -21,6 +21,8 @@
 
         private readonly GenericTypeBuilderService genericTypeBuilderService;
 
+        private readonly ParameterSymbolBuilderService parameterSymbolBuilderService;
+
         private readonly bool writeXmlDoc;
 
         #endregion
@@ -32,10 +34,12 @@
         /// </summary>
         public MethodsBuilderService(GenericTypeBuilderService genericTypeBuilderService,
                                      ArgumentsBuilderService argumentsBuilderService,
+                                     ParameterSymbolBuilderService parameterSymbolBuilderService,
                                      bool writeXmlDoc)
         {
             this.genericTypeBuilderService = genericTypeBuilderService;
             this.argumentsBuilderService = argumentsBuilderService;
+            this.parameterSymbolBuilderService = parameterSymbolBuilderService;
             this.writeXmlDoc = writeXmlDoc;
         }
 
@@ -86,7 +90,7 @@
 
                 var arguments = this.argumentsBuilderService.BuildMethodArgument(factoryMethodParameters)
                                     .ToArray();
-                var constructorArguments = this.BuildConstructorArguments(constructor, arguments, fields, injectedParameters, factoryInterfaceName);
+                var constructorArguments = this.BuildConstructorParameters(constructor, arguments, fields, injectedParameters, factoryInterfaceName);
                 var genericArguments = this.genericTypeBuilderService.Build(factoryMethod.TypeParameters);
 
                 if (this.writeXmlDoc)
@@ -164,20 +168,23 @@
             }
         }
 
-        private IEnumerable<Argument> BuildConstructorArguments(IMethodSymbol constructor,
-                                                                IEnumerable<Argument> methodArguments,
-                                                                IEnumerable<Field> parameters,
-                                                                IEnumerable<IParameterSymbol> injectedParameters,
-                                                                string factoryInterfaceName)
+        private IEnumerable<Parameter> BuildConstructorParameters(IMethodSymbol constructor,
+                                                                  IEnumerable<Argument> methodArguments,
+                                                                  IEnumerable<Field> parameters,
+                                                                  IEnumerable<IParameterSymbol> injectedParameters,
+                                                                  string factoryInterfaceName)
         {
             var injectedParameterSymbols = injectedParameters as IParameterSymbol[] ?? injectedParameters.ToArray();
 
-            var arguments = constructor.Parameters
-                                       .Where(x => parameters.Any(f => f.Name == x.Name) || methodArguments.Any(a => a.Name == x.Name) || x.Type.Name == factoryInterfaceName)
-                                       .Select(x => this.argumentsBuilderService.BuildSingle(GetConstructorArgument(x, injectedParameterSymbols, factoryInterfaceName), x, injectedParameterSymbols.Any(p => p.Name == x.Name)));
+            var constructorParameters = constructor.Parameters
+                                                   .Where(x => parameters.Any(f => f.Name == x.Name) || methodArguments.Any(a => a.Name == x.Name) || x.Type.Name == factoryInterfaceName)
+                                                   .Select(x => new Parameter(GetConstructorArgument(x,
+                                                                                                     injectedParameterSymbols,
+                                                                                                     factoryInterfaceName),
+                                                                              injectedParameterSymbols.Any(p => p.Name == x.Name),
+                                                                              this.parameterSymbolBuilderService.DeterminesIfValueType(x.Type)));
 
-            // Give the responsability to the argument service
-            return this.argumentsBuilderService.SetLastArgument(arguments);
+            return constructorParameters;
         }
 
         #endregion

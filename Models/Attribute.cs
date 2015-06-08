@@ -1,7 +1,6 @@
 ﻿namespace DeveloperInTheFlow.FactoryGenerator.Models
 {
     using System.Collections.Generic;
-    using System.Linq;
 
     public class Attribute
     {
@@ -19,7 +18,7 @@
         ///     Initializes a new instance of the <see cref="Attribute"/> class.
         /// </summary>
         public Attribute(string name,
-                         IEnumerable<Argument> arguments)
+                         IEnumerable<Value> arguments)
             : this(name)
         {
             this.Arguments = arguments;
@@ -29,7 +28,7 @@
 
         #region Public Properties
 
-        public IEnumerable<Argument> Arguments { get; private set; }
+        public IEnumerable<Value> Arguments { get; private set; }
 
         public string Name { get; private set; }
 

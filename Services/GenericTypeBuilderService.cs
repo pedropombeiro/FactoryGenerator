@@ -23,9 +23,9 @@
         /// <returns>
         ///     An <see cref="Enumerable"/> of arguments representing generic type.
         /// </returns>
-        public IEnumerable<Argument> Build(IEnumerable<ITypeParameterSymbol> typeParameterSymbols)
+        public IEnumerable<GenericType> Build(IEnumerable<ITypeParameterSymbol> typeParameterSymbols)
         {
-            return typeParameterSymbols.Select(x => new Argument(x.Name, x.Name));
+            return typeParameterSymbols.Select(x => new GenericType(x.Name));
         }
 
         /// <summary>

@@ -41,10 +41,10 @@ namespace DeveloperInTheFlow.FactoryGenerator.Services
         ///     Builds the model representing the constructor of the factory.
         /// </summary>
         /// <param name="concreteClassDeclarationSyntax">
-        ///     The concrete class that will be builded with the factory.
+        ///   The concrete class that will be builded with the factory.
         /// </param>
         /// <param name="injectedParameters">
-        ///     The injected parameters in the factory.
+        ///   The injected parameters in the factory.
         /// </param>
         /// <returns>
         ///     The model representing the constructor of the factory.
