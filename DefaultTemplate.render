@@ -1,0 +1,66 @@
+﻿#pragma warning disable 1591
+{{#if OuterUsings}}
+
+{{OuterUsings}}
+{{/if}}
+
+namespace {{Namespace}}
+{
+{{InnerUsings}}
+    /// <summary>
+    ///		The implementation for the factory generating <see cref="{{Class.ConcreteClassName}}" /> instances.
+    /// </summary>
+{{#each Class.Attributes}}
+	[{{Name}}{{#if Arguments}}({{#each Arguments}}{{&Text}}{{^IsLast}}, {{/IsLast}}{{/each}}){{/if}}]
+{{/each}}
+    public partial class {{Class.Name}}{{#Class.GenericTypes}}<{{&Class.GenericTypes}}>{{/Class.GenericTypes}} : {{&Class.Inherit}}
+    {
+		{{#if Class.Fields}}
+		#region Fields
+
+		{{#each Class.Fields}}
+		private readonly {{&Type}} {{Name}};
+
+		{{/each}}
+		#endregion
+
+		{{/if}}
+		{{#if Class.Constructor}}
+		#region Constructors
+
+		public {{Class.Name}} (
+		{{#each Class.Constructor.Arguments}}
+			{{&Attribute}} {{&Type}} {{Name}}{{#if IsLast}}){{#else}}, {{/if}}
+		{{/each}}
+		{
+			{{#each Class.Fields}}
+				this.{{Name}} = {{Name}};
+			{{/each}}
+		}
+
+		#endregion
+
+		{{/if}}
+		{{#if Class.Methods}}
+		#region Public Factory Methods
+
+		{{#each Class.Methods}}
+{{#if XmlDoc}}
+{{&XmlDoc}}
+{{/if}}
+		public {{&ReturnType}} {{Name}}{{#GenericTypes}}<{{&GenericTypes}}>{{/GenericTypes}}({{^Arguments}}){{/Arguments}}
+		{{#each Arguments}}
+			 {{&Attribute}} {{&Type}} {{Name}}{{#if IsLast}}){{#else}}, {{/if}}
+		{{/each}}
+		{
+			return new {{&NewInstanceType}} ({{^ImplementationParameters}});{{/ImplementationParameters}}
+				{{#each ImplementationParameters}}
+					{{&Value}}{{#if IsLast}});{{#else}}, {{/if}}
+				{{/each}}
+		}
+
+		{{/each}}
+		#endregion
+		{{/if}}
+    }
+}
