@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("FactoryGenerator")]
-[assembly: AssemblyCopyright("Copyright © Pedro Pombeiro 2014")]
+[assembly: AssemblyCopyright("Copyright © Pedro Pombeiro 2015")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
