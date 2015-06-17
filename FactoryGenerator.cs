@@ -528,10 +528,10 @@
             var factoryClass = new Class(classAttributes, concreteClassName, constructor, methods, fields, classGenericTypes, inherit, factoryName);
 
             // The file containing the factory
-            var factoryFile = new FactoryFile(@namespace,
-                                              factoryClass,
-                                              innerUsingDeclarations.ToFullString(),
-                                              outerUsingDeclarations.ToFullString());
+            var factoryFile = FactoryFile.Create(@namespace,
+                                                 factoryClass,
+                                                 innerUsingDeclarations.ToFullString(),
+                                                 outerUsingDeclarations.ToFullString());
 
             // The result of the generator
             var factoryResult = factoryGeneratorEngine.Generate(fileName, typeDeclarationDocument.Folders, factoryFile);
