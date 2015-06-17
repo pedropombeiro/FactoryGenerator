@@ -33,6 +33,8 @@
 
         #region Fields
 
+        private readonly string[] attributeImportList;
+
         private readonly ConstructorBuilderService constructorBuilderService;
 
         private readonly FieldsBuilderService fieldsBuilderService;
@@ -62,6 +64,9 @@
         {
             this.workspace = workspace;
             this.solution = solution;
+
+            var importList = attributeImportList as string[] ?? attributeImportList.ToArray();
+            this.attributeImportList = importList;
             this.templatePath = templatePath;
 
             var parameterSymbolService = new ParameterSymbolBuilderService();
@@ -69,7 +74,7 @@
 
             this.fieldsBuilderService = new FieldsBuilderService(parameterSymbolService);
             this.genericTypeBuilderService = new GenericTypeBuilderService();
-            this.constructorBuilderService = new ConstructorBuilderService(attributeImportList, argumentBuilderService);
+            this.constructorBuilderService = new ConstructorBuilderService(importList, argumentBuilderService);
             this.methodsBuilderService = new MethodsBuilderService(this.genericTypeBuilderService, argumentBuilderService, parameterSymbolService, writeXmlDoc);
         }
 
@@ -484,11 +489,25 @@
             var generateCodeArguments = new[] { new Value("\"DeveloperInTheFlow.FactoryGenerator\"", false), new Value(string.Format("\"{0}\"", this.version), true) };
 
             // Class attributes
-            var classAttributes = new[]
-                                  {
-                                      new Attribute("global::System.CodeDom.Compiler.GeneratedCode", generateCodeArguments),
-                                      new Attribute("global::System.Diagnostics.DebuggerNonUserCodeAttribute")
-                                  };
+            var classAttributes = concreteClassDeclarationSyntax.AttributeLists
+                                                                .SelectMany(al => al.Attributes).Where(attributeSyntax =>
+                                                                                                       {
+                                                                                                           var attributeName = attributeSyntax.Name.ToString();
+                                                                                                           return this.attributeImportList.Any(attributeName.Contains);
+                                                                                                       })
+                                                                .Select(a =>
+                                                                        {
+                                                                            var lastIndex = a.ArgumentList.Arguments.Count - 1;
+
+                                                                            var arguments = a.ArgumentList.Arguments.Select((arg,
+                                                                                                                             i) => new Value(arg.ToString(), i == lastIndex));
+                                                                            return Attribute.Create(a.Name.ToString(), arguments);
+                                                                        })
+                                                                .Concat(new[]
+                                                                        {
+                                                                            Attribute.Create("global::System.CodeDom.Compiler.GeneratedCode", generateCodeArguments),
+                                                                            Attribute.Create("global::System.Diagnostics.DebuggerNonUserCodeAttribute")
+                                                                        }).ToArray();
 
             // Generic types of the factory
             var classGenericTypes = this.genericTypeBuilderService.Build(factoryInterfaceTypeSymbol.TypeParameters);
@@ -509,10 +528,10 @@
             var factoryClass = new Class(classAttributes, concreteClassName, constructor, methods, fields, classGenericTypes, inherit, factoryName);
 
             // The file containing the factory
-            var factoryFile = new FactoryFile(@namespace,
-                                              factoryClass,
-                                              innerUsingDeclarations.ToFullString(),
-                                              outerUsingDeclarations.ToFullString());
+            var factoryFile = FactoryFile.Create(@namespace,
+                                                 factoryClass,
+                                                 innerUsingDeclarations.ToFullString(),
+                                                 outerUsingDeclarations.ToFullString());
 
             // The result of the generator
             var factoryResult = factoryGeneratorEngine.Generate(fileName, typeDeclarationDocument.Folders, factoryFile);
