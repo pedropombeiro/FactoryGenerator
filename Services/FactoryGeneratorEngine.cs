@@ -1,6 +1,7 @@
 ﻿namespace DeveloperInTheFlow.FactoryGenerator.Services
 {
     using System.Collections.Generic;
+    using System.IO;
 
     using DeveloperInTheFlow.FactoryGenerator.Models;
 
@@ -56,10 +57,26 @@
                                                IEnumerable<string> folders,
                                                FactoryFile model)
         {
-            var code = Render.FileToString(this.templatePath, model);
+            var template = this.ResolveTemplatePath(model);
+            var code = Render.FileToString(template, model);
             var document = this.project.AddDocument(fileName, code, folders);
 
             return new FactorGeneratoryResult(document, code);
+        }
+
+        #endregion
+
+        #region Methods
+
+        private string ResolveTemplatePath(FactoryFile model)
+        {
+            var customTemplatePath = string.Format("{0}.render", model.FactoryFor);
+            if (File.Exists(customTemplatePath))
+            { 
+                return customTemplatePath;
+            }
+
+            return templatePath;
         }
 
         #endregion

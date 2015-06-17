@@ -27,6 +27,8 @@
 
         public string OuterUsings { get; private set; }
 
+        public string FactoryFor { get; set; }
+
         #endregion
 
         #region Public Methods and Operators
@@ -44,6 +46,7 @@
             factoryFile.Namespace = ns;
             factoryFile.InnerUsings = innerUsings;
             factoryFile.OuterUsings = outerUsings;
+            factoryFile.FactoryFor = @class.Inherit;
 
             return factoryFile;
         }
