@@ -13,6 +13,8 @@
 
     using Common.Logging;
 
+    using CSScriptLibrary;
+
     using DeveloperInTheFlow.FactoryGenerator.Models;
     using DeveloperInTheFlow.FactoryGenerator.Services;
 
@@ -20,6 +22,8 @@
 
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+    using Newtonsoft.Json.Linq;
 
     using Attribute = DeveloperInTheFlow.FactoryGenerator.Models.Attribute;
 
@@ -333,6 +337,15 @@
             }
         }
 
+        private static JObject Transform(JObject factoryFile,
+                                         string transformationScriptPath)
+        {
+            dynamic script = CSScript.Evaluator.LoadFile(transformationScriptPath);
+            var @out = script.Transform(factoryFile);
+
+            return @out;
+        }
+
         private static void UpdateDocument(Document document,
                                            string newText)
         {
@@ -533,8 +546,18 @@
                                                  innerUsingDeclarations.ToFullString(),
                                                  outerUsingDeclarations.ToFullString());
 
+            object model = factoryFile;
+            var transformationScript = string.Format(@"{0}\{1}.tcs", Path.GetDirectoryName(this.templatePath), factoryFile.FactoryFor);
+
+            // Execute the script associated to the template in order to adapt the model for the template whether it exists.
+            if (File.Exists(transformationScript))
+            {
+                var json = JObject.FromObject(factoryFile);
+                model = Transform(json, transformationScript);
+            }
+
             // The result of the generator
-            var factoryResult = factoryGeneratorEngine.Generate(fileName, typeDeclarationDocument.Folders, factoryFile);
+            var factoryResult = factoryGeneratorEngine.Generate(fileName, typeDeclarationDocument.Folders, model, factoryFile.FactoryFor);
 
             var existingDocument = project.Documents.FirstOrDefault(doc => doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase));
 
