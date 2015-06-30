@@ -3,6 +3,9 @@
     using System.Collections.Generic;
     using System.Linq;
 
+    /// <summary>
+    ///     Model representing a factory method.
+    /// </summary>
     public class Method
     {
         #region Fields
@@ -43,8 +46,14 @@
 
         #region Public Properties
 
-        public IEnumerable<Argument> Arguments { get; private set; }
+        /// <summary>
+        ///     Arguments available for building a factory methods.
+        /// </summary>
+        public IEnumerable<Argument> Arguments { get; set; }
 
+        /// <summary>
+        ///     The generic type of the method.
+        /// </summary>
         public string GenericTypes
         {
             get
@@ -53,14 +62,29 @@
             }
         }
 
-        public IEnumerable<Parameter> ImplementationParameters { get; private set; }
+        /// <summary>
+        ///     The <see cref="Parameter"/> passed to the method to build the object.
+        /// </summary>
+        public IEnumerable<Parameter> ImplementationParameters { get; set; }
 
-        public string Name { get; private set; }
+        /// <summary>
+        ///     The name of the method.
+        /// </summary>
+        public string Name { get; set; }
 
+        /// <summary>
+        ///     The type of the object that will be builded.
+        /// </summary>
         public string NewInstanceType { get; set; }
 
-        public string ReturnType { get; private set; }
+        /// <summary>
+        ///     The return type of the method.
+        /// </summary>
+        public string ReturnType { get; set; }
 
+        /// <summary>
+        ///     The XML documentation of the method.
+        /// </summary>
         public string XmlDoc { get; set; }
 
         #endregion
