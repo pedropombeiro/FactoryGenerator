@@ -68,6 +68,7 @@ public class Script
   public JObject Transform(JObject json)
   {
       // Your transformation ...
+      return json;
   }
 }
 ```
