@@ -51,17 +51,17 @@ If you have your main template **&lt;path&gt;\Templates\DefaultTemplate.render**
 
 ### Model transformation
 
-You can tranform the model just before the template rendering by creating a C# Script with the same name than the interface factory to customize the model passed to [Nustache](https://github.com/jdiamond/Nustache) for the rendering.
+You can tranform the model just before the template rendering by creating a C# Script with the same name as the template to customize the model passed to [Nustache](https://github.com/jdiamond/Nustache) for the rendering.
 
-If you have your main template **&lt;path&gt;\Templates\DefaultTemplate.render**, the factory generator will search whether a C# script exists in the same folder with the factory interface name (i.e: &lt;interfaceFactoryName&gt;.tcs) exists and execute the method **Transform** from the C# Script.
+The factory generator will search whether a C# script in the same folder with the template file name (i.e: &lt;templateFileName&gt;.tcs) exists and execute the method **Transform** from the C# Script.
 
 Below the method signature that the script has to define to be used.
 
 ```
 using ...
 
-using Newtonsoft.Json;        // Mandatory
-using Newtonsoft.Json.Linq;   // Mandatory
+using Newtonsoft.Json;  
+using Newtonsoft.Json.Linq;
 
 public class Script
 {
