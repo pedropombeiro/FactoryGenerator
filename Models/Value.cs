@@ -5,7 +5,7 @@
         #region Constructors and Destructors
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="Value"/> class.
+        ///     Initializes a new instance of the <see cref="Value"/> class.
         /// </summary>
         public Value(string text,
                      bool isLast)
@@ -18,9 +18,9 @@
 
         #region Public Properties
 
-        public bool IsLast { get; private set; }
+        public bool IsLast { get; set; }
 
-        public string Text { get; private set; }
+        public string Text { get; set; }
 
         #endregion
     }

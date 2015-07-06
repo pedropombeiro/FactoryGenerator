@@ -50,14 +50,18 @@
         /// <param name="model">
         ///     Model representing the factory.
         /// </param>
+        /// <param name="factoryFor">
+        ///     The template name of the factory that will be used of generating the factory.
+        /// </param>
         /// <returns>
         ///     The <see cref="Document"/> representing the factory file.
         /// </returns>
         public FactorGeneratoryResult Generate(string fileName,
                                                IEnumerable<string> folders,
-                                               FactoryFile model)
+                                               object model,
+                                               string factoryFor)
         {
-            var template = this.ResolveTemplatePath(model);
+            var template = this.ResolveTemplatePath(factoryFor);
             var code = Render.FileToString(template, model);
             var document = this.project.AddDocument(fileName, code, folders);
 
@@ -68,15 +72,15 @@
 
         #region Methods
 
-        private string ResolveTemplatePath(FactoryFile model)
+        private string ResolveTemplatePath(string factoryFor)
         {
-            var customTemplatePath = string.Format("{0}.render", model.FactoryFor);
+            var customTemplatePath = string.Format(@"{0}\{1}.render", Path.GetDirectoryName(this.templatePath), factoryFor);
             if (File.Exists(customTemplatePath))
-            { 
+            {
                 return customTemplatePath;
             }
 
-            return templatePath;
+            return this.templatePath;
         }
 
         #endregion

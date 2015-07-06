@@ -18,34 +18,34 @@
             this.IsValueType = isValueType;
         }
 
-        /// <summary>
-        ///     Initializes a new instance of the <see cref="Argument"/> class.
-        /// </summary>
-        public Argument(string type,
-                        string name,
-                        string attribute,
-                        bool isInjected,
-                        bool isValueType)
-            : this(type, name, attribute, isValueType)
-        {
-            this.IsInjected = isInjected;
-        }
-
         #endregion
 
         #region Public Properties
 
-        public string Attribute { get; private set; }
+        /// <summary>
+        ///     Gets the attribute of the argument.
+        /// </summary>
+        public string Attribute { get; set; }
 
-        public bool IsInjected { get; private set; }
-
+        /// <summary>
+        ///     Gets the value indicating whether the <see cref="Argument"/> is the last.
+        /// </summary>
         public bool IsLast { get; set; }
 
-        public bool IsValueType { get; private set; }
+        /// <summary>
+        ///     Gets the value indicating whether the <see cref="Argument"/> is a natif type, i.e.: bool, int, string, etc.
+        /// </summary>
+        public bool IsValueType { get; set; }
 
-        public string Name { get; private set; }
+        /// <summary>
+        ///     Gets the name of the <see cref="Argument"/>.
+        /// </summary>
+        public string Name { get; set; }
 
-        public string Type { get; private set; }
+        /// <summary>
+        ///     Gets the type of the <see cref="Argument"/>.
+        /// </summary>
+        public string Type { get; set; }
 
         #endregion
     }

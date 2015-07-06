@@ -39,13 +39,13 @@
 
         #region Public Properties
 
-        public IEnumerable<Attribute> Attributes { get; private set; }
+        public IEnumerable<Attribute> Attributes { get; set; }
 
-        public string ConcreteClassName { get; private set; }
+        public string ConcreteClassName { get; set; }
 
-        public Constructor Constructor { get; private set; }
+        public Constructor Constructor { get; set; }
 
-        public IEnumerable<Field> Fields { get; private set; }
+        public IEnumerable<Field> Fields { get; set; }
 
         public string GenericTypes
         {
@@ -55,11 +55,11 @@
             }
         }
 
-        public string Inherit { get; private set; }
+        public string Inherit { get; set; }
 
         public IEnumerable<Method> Methods { get; set; }
 
-        public string Name { get; private set; }
+        public string Name { get; set; }
 
         #endregion
     }

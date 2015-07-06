@@ -1,5 +1,8 @@
 ﻿namespace DeveloperInTheFlow.FactoryGenerator.Models
 {
+    /// <summary>
+    ///     Model representing a generic type.
+    /// </summary>
     public class GenericType
     {
         #region Constructors and Destructors
@@ -16,7 +19,10 @@
 
         #region Public Properties
 
-        public string Name { get; private set; }
+        /// <summary>
+        ///     Gets the name of the generic type.
+        /// </summary>
+        public string Name { get; set; }
 
         #endregion
     }

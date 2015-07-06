@@ -20,7 +20,7 @@
 
         #region Public Properties
 
-        public IEnumerable<Argument> Arguments { get; private set; }
+        public IEnumerable<Argument> Arguments { get; set; }
 
         public IEnumerable<Attribute> Attributes { get; set; }
 

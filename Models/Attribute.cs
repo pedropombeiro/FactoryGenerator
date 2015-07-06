@@ -7,27 +7,34 @@
 
     public class Attribute
     {
-        #region Constructors and Destructors
-
-        /// <summary>
-        ///     Initializes a new instance of the <see cref="Attribute"/> class.
-        /// </summary>
-        protected Attribute()
-        {
-        }
-
-        #endregion
-
         #region Public Properties
 
-        public IEnumerable<Value> Arguments { get; private set; }
+        /// <summary>
+        ///     Gets <see cref="Argument"/>s of the <see cref="Attribute"/>.
+        /// </summary>
+        public IEnumerable<Value> Arguments { get; set; }
 
-        public string Name { get; private set; }
+        /// <summary>
+        ///     Gets the name of the <see cref="Attribute"/>.
+        /// </summary>
+        public string Name { get; set; }
 
         #endregion
 
         #region Public Methods and Operators
 
+        /// <summary>
+        ///     Creates an <see cref="Attribute"/> with the <paramref name="name"/> and its <paramref name="arguments"/>.
+        /// </summary>
+        /// <param name="name">
+        ///     The name of the <see cref="Attribute"/>.
+        /// </param>
+        /// <param name="arguments">
+        ///     <see cref="Argument"/>s of the <see cref="Attribute"/>.
+        /// </param>
+        /// <returns>
+        ///     An instance of the <see cref="Attribute"/> with the <paramref name="name"/> and its <paramref name="arguments"/>.
+        /// </returns>
         public static Attribute Create(string name,
                                        IEnumerable<Value> arguments)
         {

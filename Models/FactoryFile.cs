@@ -4,35 +4,50 @@
 
     using DeveloperInTheFlow.FactoryGenerator.Services;
 
+    /// <summary>
+    ///     Model representing the factory file.
+    /// </summary>
     public class FactoryFile
     {
-        #region Constructors and Destructors
-
-        /// <summary>
-        ///     Initializes a new instance of the <see cref="FactoryFile"/> class.
-        /// </summary>
-        protected FactoryFile()
-        {
-        }
-
-        #endregion
-
         #region Public Properties
 
-        public Class Class { get; private set; }
+        /// <summary>
+        ///     Gets the <see cref="Class"/> available in the <see cref="FactoryFile"/>.
+        /// </summary>
+        public Class Class { get; set; }
 
-        public string InnerUsings { get; private set; }
-
-        public string Namespace { get; private set; }
-
-        public string OuterUsings { get; private set; }
-
+        /// <summary>
+        ///     Gets the template name used for generating the factory.
+        /// </summary>
         public string FactoryFor { get; set; }
+
+        /// <summary>
+        ///     The inner usings of the factory.
+        /// </summary>
+        public string InnerUsings { get; set; }
+
+        /// <summary>
+        ///     Gets the namespace of the factory.
+        /// </summary>
+        public string Namespace { get; set; }
+
+        /// <summary>
+        ///     Gets the outer usings of the factory.
+        /// </summary>
+        public string OuterUsings { get; set; }
 
         #endregion
 
         #region Public Methods and Operators
 
+        /// <summary>
+        ///     Creates a <see cref="FactoryFile"/>.
+        /// </summary>
+        /// <param name="ns"></param>
+        /// <param name="class"></param>
+        /// <param name="innerUsings"></param>
+        /// <param name="outerUsings"></param>
+        /// <returns></returns>
         public static FactoryFile Create(string ns,
                                          Class @class,
                                          string innerUsings,

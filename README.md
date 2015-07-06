@@ -1,7 +1,7 @@
 FactoryGenerator
 ================
 
-[![Build Status](https://img.shields.io/travis/minidfx/FactoryGenerator.svg)](https://travis-ci.org/minidfx/FactoryGenerator)[![NuGet](https://img.shields.io/nuget/dt/DeveloperInTheFlow.FactoryGenerator.svg)](http://www.nuget.org/packages/DeveloperInTheFlow.FactoryGenerator/)
+[![Build Status](https://img.shields.io/travis/minidfx/FactoryGenerator.svg)](https://travis-ci.org/minidfx/FactoryGenerator) [![NuGet](https://img.shields.io/nuget/dt/DeveloperInTheFlow.FactoryGenerator.svg)](http://www.nuget.org/packages/DeveloperInTheFlow.FactoryGenerator/)
 
 Tools for generating factories of your classes marked by the attribute GenerateFactory. It will generate a file (&lt;TargetClass&gt;Factory.Generated.cs) at the same location than the class file.
 
@@ -39,3 +39,38 @@ or through Visual Studio as an external tool, follow steps for using it in Visua
 -	Run it in Visual Studio by clicking on the menu **Tools -> Generate Factories**.
 
 Enjoy!
+
+Advanced features
+-----------------
+
+### Custom template in according an interface
+
+You can add a custom template naming with the same name than the interface factory to customize the output of some factories.
+
+If you have your main template **&lt;path&gt;\Templates\DefaultTemplate.render**, the factory generator will search whether a template in the same folder with the factory interface name (i.e: &lt;interfaceFactoryName&gt;.render) exists and use it instead of the main template.
+
+### Model transformation
+
+You can tranform the model just before the template rendering by creating a C# Script with the same name as the template to customize the model passed to [Nustache](https://github.com/jdiamond/Nustache) for the rendering.
+
+The factory generator will search whether a C# script in the same folder with the template file name (i.e: &lt;templateFileName&gt;.tcs) exists and execute the method **Transform** from the C# Script.
+
+Below the method signature that the script has to define to be used.
+
+```
+using ...
+
+using Newtonsoft.Json;  
+using Newtonsoft.Json.Linq;
+
+public class Script
+{
+  public JObject Transform(JObject json)
+  {
+      // Your transformation ...
+      return json;
+  }
+}
+```
+
+As you can see, the script use [JSON.Net](https://github.com/JamesNK/Newtonsoft.Json) library to make its transformations.
