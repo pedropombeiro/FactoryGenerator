@@ -2,7 +2,6 @@
 {
     using System;
     using System.Linq;
-    using System.Text.RegularExpressions;
 
     using Microsoft.CodeAnalysis;
 
@@ -11,12 +10,6 @@
     /// </summary>
     public class ParameterSymbolBuilderService
     {
-        #region Static Fields
-
-        private static readonly Regex ParseTypeRegex = new Regex(@"([^[\]]+) [^ ]+$");
-
-        #endregion
-
         #region Public Methods and Operators
 
         /// <summary>
@@ -88,18 +81,7 @@
         /// </returns>
         private static string CleanFullType(IParameterSymbol parameterSymbol)
         {
-            var originalSyntax = parameterSymbol.DeclaringSyntaxReferences[0].GetSyntax().ToString();
-
-            var resultRegex = ParseTypeRegex.Match(originalSyntax);
-
-            if (!resultRegex.Success)
-            {
-                throw new InvalidOperationException(string.Format("Cannot parse the parameter {0} to identify the type.", originalSyntax));
-            }
-
-            var shortType = resultRegex.Groups[1].Value;
-
-            return shortType;
+            return parameterSymbol.DeclaringSyntaxReferences[0].GetSyntax().ChildNodes().First().ToString();
         }
 
         #endregion
