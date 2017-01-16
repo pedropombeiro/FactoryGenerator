@@ -559,7 +559,7 @@
             // The result of the generator
             var factoryResult = factoryGeneratorEngine.Generate(fileName, typeDeclarationDocument.Folders, model, factoryFile.FactoryFor);
 
-            var existingDocument = project.Documents.FirstOrDefault(doc => doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase));
+            var existingDocument = project.Documents.SingleOrDefault(doc => doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase) && doc.Folders.SequenceEqual(typeDeclarationDocument.Folders));
 
             if (existingDocument != null)
             {
