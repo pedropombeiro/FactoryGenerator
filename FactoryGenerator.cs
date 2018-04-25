@@ -21,6 +21,7 @@
     using Humanizer;
 
     using Microsoft.CodeAnalysis;
+    using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
 
     using Newtonsoft.Json.Linq;
@@ -199,31 +200,28 @@
             return fullyQualifiedName;
         }
 
-        private static string GetDeclarationNamespaceFullName(BaseTypeDeclarationSyntax typeDeclarationSyntax)
+        private static string GetDeclarationNamespaceFullName(CSharpSyntaxNode typeDeclarationSyntax)
         {
             var namespaceDeclarationSyntax = typeDeclarationSyntax.FirstAncestorOrSelf<NamespaceDeclarationSyntax>();
             return namespaceDeclarationSyntax.Name.ToString();
         }
 
-        private static AttributeData GetFactoryAttributeFromTypeSymbol(INamedTypeSymbol concreteClassTypeSymbol)
+        private static AttributeSyntax GetFactoryAttributeFromClassDeclaration(ClassDeclarationSyntax concreteClassDeclarationSyntax)
         {
-            AttributeData factoryAttribute;
+            AttributeSyntax factoryAttribute;
             try
             {
-                factoryAttribute = concreteClassTypeSymbol.GetAttributes().Single(a =>
-                                                                                  {
-                                                                                      var attributeClassFullName = a.AttributeClass.ToString();
-                                                                                      return attributeClassFullName.EndsWith(".GenerateFactoryAttribute") || attributeClassFullName.EndsWith(".GenerateFactory");
-                                                                                  });
+                factoryAttribute = concreteClassDeclarationSyntax.AttributeLists.SelectMany(a => a.Attributes)
+                                                                            .SingleOrDefault(
+                                                                                              a =>
+                                                                                              {
+                                                                                                  var attributeClassFullName = a.Name.NormalizeWhitespace().ToFullString();
+                                                                                                  return attributeClassFullName.EndsWith("GenerateFactoryAttribute") || attributeClassFullName.EndsWith("GenerateFactory");
+                                                                                              });
             }
             catch (InvalidOperationException e)
             {
-                throw new InvalidOperationException("Could not read GenerateFactoryAttribute from {0} type.".FormatWith(concreteClassTypeSymbol.Name), e);
-            }
-
-            if (factoryAttribute.AttributeClass.Kind == SymbolKind.ErrorType)
-            {
-                throw new InvalidOperationException("Cannot parse the attribute in {0}. Please check if the project is ready to compile successfully.".FormatWith(concreteClassTypeSymbol));
+                throw new InvalidOperationException("Could not read GenerateFactoryAttribute from {0} type.".FormatWith(concreteClassDeclarationSyntax), e);
             }
 
             return factoryAttribute;
@@ -396,7 +394,7 @@
                         var fullyQualifiedMetadataName = GetDeclarationFullName(classDeclarationSyntax);
                         var resolvedConcreteClassType = compilation.GetTypeByMetadataName(fullyQualifiedMetadataName);
 
-                        var generatedFilePath = this.GenerateFactoryForClass(classDeclarationSyntax, resolvedConcreteClassType);
+                        var generatedFilePath = this.GenerateFactoryForClass(classDeclarationSyntax, resolvedConcreteClassType, compilation);
                         generatedFactoriesList.Add(generatedFilePath);
 
                         Logger.Debug(new string('-', 80));
@@ -407,16 +405,43 @@
             return generatedFactoriesList;
         }
 
-        private string GenerateFactoryForClass(ClassDeclarationSyntax concreteClassDeclarationSyntax,
-                                               INamedTypeSymbol concreteClassTypeSymbol)
+        private string GenerateFactoryForClass(
+            ClassDeclarationSyntax concreteClassDeclarationSyntax,
+            INamedTypeSymbol concreteClassTypeSymbol,
+            Compilation compilation)
         {
-            var factoryAttribute = GetFactoryAttributeFromTypeSymbol(concreteClassTypeSymbol);
+            var factoryAttribute = GetFactoryAttributeFromClassDeclaration(concreteClassDeclarationSyntax);
 
             INamedTypeSymbol factoryInterfaceTypeSymbol;
-            if (factoryAttribute.ConstructorArguments != null && factoryAttribute.ConstructorArguments.Any())
+            if (factoryAttribute.ArgumentList != null && factoryAttribute.ArgumentList.Arguments.Any())
             {
-                var typeOfArgument = factoryAttribute.ConstructorArguments.Single();
-                factoryInterfaceTypeSymbol = (INamedTypeSymbol)typeOfArgument.Value;
+                var typeOfArgument = factoryAttribute.ArgumentList.Arguments.Single();
+
+                var usings = concreteClassDeclarationSyntax.Parent.DescendantNodes()
+                                                           .OfType<UsingDirectiveSyntax>()
+                                                           .Select(syntax => syntax.Name.NormalizeWhitespace().ToFullString())
+                                                           .ToArray();
+
+                var namespaces = usings.Concat(new [] { GetDeclarationNamespaceFullName(concreteClassDeclarationSyntax) });
+
+                var typeName = ((TypeOfExpressionSyntax)typeOfArgument.Expression).Type.ToFullString();
+
+                if (typeName.EndsWith(">"))
+                {
+                    var genericsPostfix = typeName.Substring(typeName.IndexOf("<", StringComparison.InvariantCulture));
+                    var genericArgumentCount = genericsPostfix.Count(c => c == ',') + 1;
+
+                    typeName = typeName.Replace(genericsPostfix, $"`{genericArgumentCount}");
+                }
+
+                var fulltypeNames = namespaces.Select(ns => $"{ns}.{typeName}").Concat(new [] { typeName });
+
+                factoryInterfaceTypeSymbol = fulltypeNames.Select(compilation.GetTypeByMetadataName).FirstOrDefault(o => o != null);
+
+                if (factoryInterfaceTypeSymbol == null)
+                {
+                    throw new InvalidOperationException("Factory {0} type couldn't be resolved in {1}.".FormatWith(typeName, GetDeclarationFullName(concreteClassDeclarationSyntax)));
+                }
 
                 if (factoryInterfaceTypeSymbol.IsUnboundGenericType)
                 {
@@ -425,7 +450,7 @@
             }
             else
             {
-                throw new InvalidOperationException("Factory type must be specified in {0} on {1}.".FormatWith(factoryAttribute.AttributeClass, GetDeclarationFullName(concreteClassDeclarationSyntax)));
+                throw new InvalidOperationException("Factory type must be specified in {0} on {1}.".FormatWith(factoryAttribute.Name.ToFullString(), GetDeclarationFullName(concreteClassDeclarationSyntax)));
             }
 
             var factoryClassGenericName = GetFactoryClassGenericName(concreteClassDeclarationSyntax, factoryInterfaceTypeSymbol);

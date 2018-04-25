@@ -5,6 +5,8 @@
     using System.Reflection;
     using System.Threading.Tasks;
 
+    using CommandLine;
+
     using Common.Logging;
 
     using Microsoft.CodeAnalysis.MSBuild;
@@ -53,11 +55,13 @@
 
         private static void Main(string[] args)
         {
-            CommandLineOptions = new CommandLineOptions();
-            if (!CommandLine.Parser.Default.ParseArguments(args, CommandLineOptions))
+            var result = Parser.Default.ParseArguments(() => new CommandLineOptions(), args) as Parsed<CommandLineOptions>;
+            if (result == null)
             {
                 Environment.Exit(1);
             }
+
+            CommandLineOptions = result.Value;
 
             try
             {
