@@ -14,18 +14,23 @@
     {
         #region Public Methods and Operators
 
-        /// <summary>
-        ///     Yields arguments for generic types.
-        /// </summary>
-        /// <param name="typeParameterSymbols">
-        ///     The <see cref="Enumerable"/> of the generic type as parameters.
-        /// </param>
-        /// <returns>
-        ///     An <see cref="Enumerable"/> of arguments representing generic type.
-        /// </returns>
-        public IEnumerable<GenericType> Build(IEnumerable<ITypeParameterSymbol> typeParameterSymbols)
+	    /// <summary>
+	    ///     Yields arguments for generic types.
+	    /// </summary>
+	    /// <param name="typeParameterSymbols">
+	    ///     The <see cref="Enumerable"/> of the generic type as parameters.
+	    /// </param>
+	    /// <param name="genericArgumentTypeSymbols"></param>
+	    /// <returns>
+	    ///     An <see cref="Enumerable"/> of arguments representing generic type.
+	    /// </returns>
+	    public IEnumerable<GenericType> Build(
+		    IEnumerable<ITypeParameterSymbol> typeParameterSymbols,
+		    INamedTypeSymbol[] genericArgumentTypeSymbols = null)
         {
-            return typeParameterSymbols.Select(x => new GenericType(x.Name));
+            return typeParameterSymbols.Select((x, i) => (i, new GenericType(x.Name)))
+                                       .Where(t => genericArgumentTypeSymbols?[t.Item1] == null)
+                                       .Select(t => t.Item2);
         }
 
         /// <summary>

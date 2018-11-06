@@ -47,32 +47,33 @@
 
         #region Public Methods and Operators
 
-        /// <summary>
-        ///     Builds models representing methods of the factories.
-        /// </summary>
-        /// <param name="concreteClassSymbol">
-        ///     Represents the concrete class.
-        /// </param>
-        /// <param name="fields">
-        ///     Fields available in the factory.
-        /// </param>
-        /// <param name="injectedParameters">
-        ///     The injected parameters in the factory.
-        /// </param>
-        /// <param name="factoryMethods">
-        ///     The factory methods retrieved with Roslyn.
-        /// </param>
-        /// <param name="factoryInterfaceName">
-        ///     The interface name of the factory.
-        /// </param>
-        /// <returns>
-        ///     Models representing the factory methods.
-        /// </returns>
-        public IEnumerable<Method> Build(INamedTypeSymbol concreteClassSymbol,
-                                         IEnumerable<Field> fields,
-                                         IParameterSymbol[] injectedParameters,
-                                         IMethodSymbol[] factoryMethods,
-                                         string factoryInterfaceName)
+	    /// <summary>
+	    ///     Builds models representing methods of the factories.
+	    /// </summary>
+	    /// <param name="concreteClassSymbol">
+	    ///     Represents the concrete class.
+	    /// </param>
+	    /// <param name="fields">
+	    ///     Fields available in the factory.
+	    /// </param>
+	    /// <param name="injectedParameters">
+	    ///     The injected parameters in the factory.
+	    /// </param>
+	    /// <param name="factoryMethods">
+	    ///     The factory methods retrieved with Roslyn.
+	    /// </param>
+	    /// <param name="factoryInterfaceName">
+	    ///     The interface name of the factory.
+	    /// </param>
+	    /// <returns>
+	    ///     Models representing the factory methods.
+	    /// </returns>
+	    public IEnumerable<Method> Build(
+		    INamedTypeSymbol concreteClassSymbol,
+		    IEnumerable<Field> fields,
+		    IParameterSymbol[] injectedParameters,
+		    (ITypeSymbol returnType, IMethodSymbol symbol)[] factoryMethods,
+		    string factoryInterfaceName)
         {
             if (!factoryMethods.Any())
             {
@@ -85,22 +86,22 @@
 // ReSharper disable once LoopCanBeConvertedToQuery
             foreach (var factoryMethod in factoryMethods)
             {
-                var constructor = GetConstructorFromFactoryMethod(factoryMethod, concreteClassSymbol);
-                var factoryMethodParameters = factoryMethod.Parameters;
+                var constructor = GetConstructorFromFactoryMethod(factoryMethod.symbol, concreteClassSymbol);
+                var factoryMethodParameters = factoryMethod.symbol.Parameters;
 
                 var arguments = this.argumentsBuilderService.BuildMethodArgument(factoryMethodParameters)
                                     .ToArray();
                 var constructorArguments = this.BuildConstructorParameters(constructor, arguments, fields, injectedParameters, factoryInterfaceName);
-                var genericArguments = this.genericTypeBuilderService.Build(factoryMethod.TypeParameters);
+                var genericArguments = this.genericTypeBuilderService.Build(factoryMethod.symbol.TypeParameters);
 
                 if (this.writeXmlDoc)
                 {
-                    var xmlComments = BuildXmlDoc(factoryMethod);
-                    methods.Add(new Method("Create", factoryMethod.ReturnType.ToString(), concreteClassSymbol.ToString(), arguments, constructorArguments, genericArguments, xmlComments));
+                    var xmlComments = BuildXmlDoc(factoryMethod.symbol);
+                    methods.Add(new Method("Create", factoryMethod.returnType.ToString(), concreteClassSymbol.ToString(), arguments, constructorArguments, genericArguments, xmlComments));
                 }
                 else
                 {
-                    methods.Add(new Method("Create", factoryMethod.ReturnType.ToString(), concreteClassSymbol.ToString(), arguments, constructorArguments, genericArguments, string.Empty));
+                    methods.Add(new Method("Create", factoryMethod.returnType.ToString(), concreteClassSymbol.ToString(), arguments, constructorArguments, genericArguments, string.Empty));
                 }
             }
 
@@ -138,14 +139,6 @@
         private static IMethodSymbol GetConstructorFromFactoryMethod(IMethodSymbol factoryMethodSymbol,
                                                                      INamedTypeSymbol concreteClassSymbol)
         {
-            if (!concreteClassSymbol.AllInterfaces.Select(i => i.OriginalDefinition).Contains(factoryMethodSymbol.ReturnType.OriginalDefinition))
-            {
-                var message = "The factory method does not return the correct type (i.e. a type inherited by {0}). Are you sure the attribute maps to the correct factory type? Currently it maps to {1}."
-                    .FormatWith(concreteClassSymbol, factoryMethodSymbol.ContainingType);
-
-                throw new InvalidOperationException(message);
-            }
-
             var factoryMethodParameters = factoryMethodSymbol.Parameters;
             var instanceConstructors = concreteClassSymbol.InstanceConstructors
                                                           .Where(c => c.DeclaredAccessibility == Accessibility.Public)
