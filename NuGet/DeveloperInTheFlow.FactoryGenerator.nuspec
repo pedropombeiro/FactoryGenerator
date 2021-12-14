@@ -39,7 +39,6 @@ Can be used in a build server environment.</description>
 		<file src="..\bin\Release\Microsoft.CodeAnalysis.VisualBasic.Workspaces.dll" target="tools\Microsoft.CodeAnalysis.VisualBasic.Workspaces.dll" />
         <file src="..\bin\Release\Microsoft.CodeAnalysis.Workspaces.dll" target="tools\Microsoft.CodeAnalysis.Workspaces.dll" />
 		<file src="..\bin\Release\Microsoft.CodeAnalysis.Workspaces.Desktop.dll" target="tools\Microsoft.CodeAnalysis.Workspaces.Desktop.dll" />
-		<file src="..\bin\Release\Microsoft.CodeAnalysis.Workspaces.MSBuild.dll" target="tools\Microsoft.CodeAnalysis.Workspaces.MSBuild.dll" />
 		<file src="..\bin\Release\Microsoft.NET.StringTools.dll" target="tools\Microsoft.NET.StringTools.dll" />
         <file src="..\bin\Release\Mono.CSharp.dll" target="tools\Mono.CSharp.dll" />
 		<file src="..\bin\Release\Mono.Posix.dll" target="tools\Mono.Posix.dll" />
@@ -58,14 +57,12 @@ Can be used in a build server environment.</description>
 		<file src="..\bin\Release\System.Reflection.Metadata.dll" target="tools\System.Reflection.Metadata.dll" />
 		<file src="..\bin\Release\System.Reflection.TypeExtensions.dll" target="tools\System.Reflection.TypeExtensions.dll" />
 		<file src="..\bin\Release\System.Runtime.CompilerServices.Unsafe.dll" target="tools\System.Runtime.CompilerServices.Unsafe.dll" />
-		<file src="..\bin\Release\System.Security.Cryptography.Algorithms.dll" target="tools\System.Security.Cryptography.Algorithms.dll" />
 		<file src="..\bin\Release\System.Text.Encoding.CodePages.dll" target="tools\System.Text.Encoding.CodePages.dll" />
 		<file src="..\bin\Release\System.Text.Encodings.Web.dll" target="tools\System.Text.Encodings.Web.dll" />
 		<file src="..\bin\Release\System.Text.Json.dll" target="tools\System.Text.Json.dll" />
 		<file src="..\bin\Release\System.Threading.Tasks.Dataflow.dll" target="tools\System.Threading.Tasks.Dataflow.dll" />
 		<file src="..\bin\Release\System.Threading.Tasks.Extensions.dll" target="tools\System.Threading.Tasks.Extensions.dll" />
 		<file src="..\bin\Release\System.ValueTuple.dll" target="tools\System.ValueTuple.dll" />
-		<file src="..\bin\Release\System.Net.Http.dll" target="tools\System.Net.Http.dll" />
         <file src="ThirdPartyNotices.rtf" target="ThirdPartyNotices.rtf" />
     </files>
 </package>
