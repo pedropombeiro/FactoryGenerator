@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
         <id>DeveloperInTheFlow.FactoryGenerator</id>
-        <version>3.2.0.0</version>
+        <version>3.3.0</version>
         <title>Factory Generator (Roslyn)</title>
         <authors>Pedro Pombeiro,Daniel Romero,Benjamin Burgy</authors>
         <owners>Pedro Pombeiro</owners>
@@ -29,11 +29,14 @@ Can be used in a build server environment.</description>
         <file src="..\bin\Release\Humanizer.dll" target="tools\Humanizer.dll" />
         <file src="tools\init.ps1" target="tools\init.ps1" />
 		<file src="..\bin\Release\Microsoft.Bcl.AsyncInterfaces.dll" target="tools\Microsoft.Bcl.AsyncInterfaces.dll" />
+		<file src="..\bin\Release\Microsoft.Build.Locator.dll" target="tools\Microsoft.Build.Locator.dll" />
 		<file src="..\bin\Release\Microsoft.CodeAnalysis.dll" target="tools\Microsoft.CodeAnalysis.dll" />
         <file src="..\bin\Release\Microsoft.CodeAnalysis.CSharp.dll" target="tools\Microsoft.CodeAnalysis.CSharp.dll" />
 		<file src="..\bin\Release\Microsoft.CodeAnalysis.CSharp.Features.dll" target="tools\Microsoft.CodeAnalysis.CSharp.Features.dll" />
 		<file src="..\bin\Release\Microsoft.CodeAnalysis.CSharp.Scripting.dll" target="tools\Microsoft.CodeAnalysis.CSharp.Scripting.dll" />
         <file src="..\bin\Release\Microsoft.CodeAnalysis.CSharp.Workspaces.dll" target="tools\Microsoft.CodeAnalysis.CSharp.Workspaces.dll" />
+		<file src="..\bin\Release\Microsoft.CodeAnalysis.Features.dll" target="tools\Microsoft.CodeAnalysis.Features.dll" />
+		<file src="..\bin\Release\Microsoft.CodeAnalysis.Scripting.dll" target="tools\Microsoft.CodeAnalysis.Scripting.dll" />
 		<file src="..\bin\Release\Microsoft.CodeAnalysis.VisualBasic.dll" target="tools\Microsoft.CodeAnalysis.VisualBasic.dll" />
 		<file src="..\bin\Release\Microsoft.CodeAnalysis.VisualBasic.Features.dll" target="tools\Microsoft.CodeAnalysis.VisualBasic.Features.dll" />
 		<file src="..\bin\Release\Microsoft.CodeAnalysis.VisualBasic.Workspaces.dll" target="tools\Microsoft.CodeAnalysis.VisualBasic.Workspaces.dll" />
