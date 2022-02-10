@@ -18,54 +18,45 @@ Can be used in a build server environment.</description>
         <tags>factories Roslyn C#</tags>
     </metadata>
     <files>
-        <file src="..\bin\Release\CommandLine.dll" target="tools\CommandLine.dll" />
-		<file src="..\bin\Release\Common.Logging.dll" target="tools\Common.Logging.dll" />
-		<file src="..\bin\Release\Common.Logging.Core.dll" target="tools\Common.Logging.Core.dll" />
-		<file src="..\bin\Release\Common.Logging.NLog41.dll" target="tools\Common.Logging.NLog41.dll" />
-        <file src="..\bin\Release\CSScriptLibrary.dll" target="tools\CSScriptLibrary.dll" />
         <file src="..\bin\Release\DefaultTemplate.render" target="tools\DefaultTemplate.render" />
         <file src="..\bin\Release\FactoryGenerator.exe" target="tools\FactoryGenerator.exe" />
         <file src="..\bin\Release\FactoryGenerator.exe.config" target="tools\FactoryGenerator.exe.config" />
-        <file src="..\bin\Release\Humanizer.dll" target="tools\Humanizer.dll" />
+        <file src="..\bin\Release\CommandLine.dll" target="tools\" />
+        <file src="..\bin\Release\Common.Logging.Core.dll" target="tools\" />
+        <file src="..\bin\Release\Common.Logging.dll" target="tools\" />
+        <file src="..\bin\Release\Common.Logging.NLog41.dll" target="tools\" />
+        <file src="..\bin\Release\CSScriptLibrary.dll" target="tools\" />
+        <file src="..\bin\Release\Esent.Interop.dll" target="tools\" />
+        <file src="..\bin\Release\Humanizer.dll" target="tools\" />
+        <file src="..\bin\Release\Microsoft.Build.Locator.dll" target="tools\" />
+        <file src="..\bin\Release\Microsoft.CodeAnalysis.CSharp.dll" target="tools\" />
+        <file src="..\bin\Release\Microsoft.CodeAnalysis.CSharp.Features.dll" target="tools\" />
+        <file src="..\bin\Release\Microsoft.CodeAnalysis.CSharp.Scripting.dll" target="tools\" />
+        <file src="..\bin\Release\Microsoft.CodeAnalysis.CSharp.Workspaces.dll" target="tools\" />
+        <file src="..\bin\Release\Microsoft.CodeAnalysis.dll" target="tools\" />
+        <file src="..\bin\Release\Microsoft.CodeAnalysis.Features.dll" target="tools\" />
+        <file src="..\bin\Release\Microsoft.CodeAnalysis.Scripting.dll" target="tools\" />
+        <file src="..\bin\Release\Microsoft.CodeAnalysis.VisualBasic.dll" target="tools\" />
+        <file src="..\bin\Release\Microsoft.CodeAnalysis.VisualBasic.Features.dll" target="tools\" />
+        <file src="..\bin\Release\Microsoft.CodeAnalysis.VisualBasic.Workspaces.dll" target="tools\" />
+        <file src="..\bin\Release\Microsoft.CodeAnalysis.Workspaces.Desktop.dll" target="tools\" />
+        <file src="..\bin\Release\Microsoft.CodeAnalysis.Workspaces.dll" target="tools\" />
+        <file src="..\bin\Release\Mono.CSharp.dll" target="tools\" />
+        <file src="..\bin\Release\Mono.Posix.dll" target="tools\" />
+        <file src="..\bin\Release\Newtonsoft.Json.dll" target="tools\" />
+        <file src="..\bin\Release\NLog.dll" target="tools\" />
+        <file src="..\bin\Release\Nustache.Core.dll" target="tools\" />
+        <file src="..\bin\Release\System.Collections.Immutable.dll" target="tools\" />
+        <file src="..\bin\Release\System.Composition.AttributedModel.dll" target="tools\" />
+        <file src="..\bin\Release\System.Composition.Convention.dll" target="tools\" />
+        <file src="..\bin\Release\System.Composition.Hosting.dll" target="tools\" />
+        <file src="..\bin\Release\System.Composition.Runtime.dll" target="tools\" />
+        <file src="..\bin\Release\System.Composition.TypedParts.dll" target="tools\" />
+        <file src="..\bin\Release\System.Reflection.Metadata.dll" target="tools\" />
+        <file src="..\bin\Release\System.Reflection.TypeExtensions.dll" target="tools\" />
+        <file src="..\bin\Release\System.Text.Encoding.CodePages.dll" target="tools\" />
+        <file src="..\bin\Release\System.ValueTuple.dll" target="tools\" />
         <file src="tools\init.ps1" target="tools\init.ps1" />
-		<file src="..\bin\Release\Microsoft.Bcl.AsyncInterfaces.dll" target="tools\Microsoft.Bcl.AsyncInterfaces.dll" />
-		<file src="..\bin\Release\Microsoft.Build.Locator.dll" target="tools\Microsoft.Build.Locator.dll" />
-		<file src="..\bin\Release\Microsoft.CodeAnalysis.dll" target="tools\Microsoft.CodeAnalysis.dll" />
-        <file src="..\bin\Release\Microsoft.CodeAnalysis.CSharp.dll" target="tools\Microsoft.CodeAnalysis.CSharp.dll" />
-		<file src="..\bin\Release\Microsoft.CodeAnalysis.CSharp.Features.dll" target="tools\Microsoft.CodeAnalysis.CSharp.Features.dll" />
-		<file src="..\bin\Release\Microsoft.CodeAnalysis.CSharp.Scripting.dll" target="tools\Microsoft.CodeAnalysis.CSharp.Scripting.dll" />
-        <file src="..\bin\Release\Microsoft.CodeAnalysis.CSharp.Workspaces.dll" target="tools\Microsoft.CodeAnalysis.CSharp.Workspaces.dll" />
-		<file src="..\bin\Release\Microsoft.CodeAnalysis.Features.dll" target="tools\Microsoft.CodeAnalysis.Features.dll" />
-		<file src="..\bin\Release\Microsoft.CodeAnalysis.Scripting.dll" target="tools\Microsoft.CodeAnalysis.Scripting.dll" />
-		<file src="..\bin\Release\Microsoft.CodeAnalysis.VisualBasic.dll" target="tools\Microsoft.CodeAnalysis.VisualBasic.dll" />
-		<file src="..\bin\Release\Microsoft.CodeAnalysis.VisualBasic.Features.dll" target="tools\Microsoft.CodeAnalysis.VisualBasic.Features.dll" />
-		<file src="..\bin\Release\Microsoft.CodeAnalysis.VisualBasic.Workspaces.dll" target="tools\Microsoft.CodeAnalysis.VisualBasic.Workspaces.dll" />
-        <file src="..\bin\Release\Microsoft.CodeAnalysis.Workspaces.dll" target="tools\Microsoft.CodeAnalysis.Workspaces.dll" />
-		<file src="..\bin\Release\Microsoft.CodeAnalysis.Workspaces.Desktop.dll" target="tools\Microsoft.CodeAnalysis.Workspaces.Desktop.dll" />
-		<file src="..\bin\Release\Microsoft.NET.StringTools.dll" target="tools\Microsoft.NET.StringTools.dll" />
-        <file src="..\bin\Release\Mono.CSharp.dll" target="tools\Mono.CSharp.dll" />
-		<file src="..\bin\Release\Mono.Posix.dll" target="tools\Mono.Posix.dll" />
-		<file src="..\bin\Release\Newtonsoft.Json.dll" target="tools\Newtonsoft.Json.dll" />
-        <file src="..\bin\Release\NLog.dll" target="tools\NLog.dll" />
-        <file src="..\bin\Release\Nustache.Core.dll" target="tools\Nustache.Core.dll" />
-		<file src="..\bin\Release\System.Buffers.dll" target="tools\System.Buffers.dll" />
-		<file src="..\bin\Release\System.Collections.Immutable.dll" target="tools\System.Collections.Immutable.dll" />
-		<file src="..\bin\Release\System.Composition.AttributedModel.dll" target="tools\System.Composition.AttributedModel.dll" />
-		<file src="..\bin\Release\System.Composition.Convention.dll" target="tools\System.Composition.Convention.dll" />
-		<file src="..\bin\Release\System.Composition.Hosting.dll" target="tools\System.Composition.Hosting.dll" />
-		<file src="..\bin\Release\System.Composition.Runtime.dll" target="tools\System.Composition.Runtime.dll" />
-		<file src="..\bin\Release\System.Composition.TypedParts.dll" target="tools\System.Composition.TypedParts.dll" />
-		<file src="..\bin\Release\System.Memory.dll" target="tools\System.Memory.dll" />
-		<file src="..\bin\Release\System.Numerics.Vectors.dll" target="tools\System.Numerics.Vectors.dll" />
-		<file src="..\bin\Release\System.Reflection.Metadata.dll" target="tools\System.Reflection.Metadata.dll" />
-		<file src="..\bin\Release\System.Reflection.TypeExtensions.dll" target="tools\System.Reflection.TypeExtensions.dll" />
-		<file src="..\bin\Release\System.Runtime.CompilerServices.Unsafe.dll" target="tools\System.Runtime.CompilerServices.Unsafe.dll" />
-		<file src="..\bin\Release\System.Text.Encoding.CodePages.dll" target="tools\System.Text.Encoding.CodePages.dll" />
-		<file src="..\bin\Release\System.Text.Encodings.Web.dll" target="tools\System.Text.Encodings.Web.dll" />
-		<file src="..\bin\Release\System.Text.Json.dll" target="tools\System.Text.Json.dll" />
-		<file src="..\bin\Release\System.Threading.Tasks.Dataflow.dll" target="tools\System.Threading.Tasks.Dataflow.dll" />
-		<file src="..\bin\Release\System.Threading.Tasks.Extensions.dll" target="tools\System.Threading.Tasks.Extensions.dll" />
-		<file src="..\bin\Release\System.ValueTuple.dll" target="tools\System.ValueTuple.dll" />
         <file src="ThirdPartyNotices.rtf" target="ThirdPartyNotices.rtf" />
     </files>
 </package>
