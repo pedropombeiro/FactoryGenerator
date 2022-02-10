@@ -2,13 +2,14 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Reflection;
     using System.Threading.Tasks;
 
     using CommandLine;
 
     using Common.Logging;
-
+    using Microsoft.Build.Locator;
     using Microsoft.CodeAnalysis.MSBuild;
 
     using NLog.Config;
@@ -65,6 +66,15 @@
 
             try
             {
+                var vsInstances = MSBuildLocator.QueryVisualStudioInstances();
+                var vs2017 = vsInstances.FirstOrDefault(x => x.Version.Major == 15);
+                var vs2019 = vsInstances.FirstOrDefault(x => x.Version.Major == 16);
+
+                VisualStudioInstance usedInstance = vs2019 ?? vs2017;
+                if (usedInstance == null)
+                    throw new Exception("Could not find VS 2019 or VS 2017 installation");
+                MSBuildLocator.RegisterInstance(usedInstance);
+
                 GenerateFactoriesAsync(CommandLineOptions.SolutionPath,
                                        CommandLineOptions.AttributeImportList.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries),
                                        CommandLineOptions.WriteXmlDoc,
@@ -77,6 +87,11 @@
                 Logger.Fatal(innerException.Message, e);
 
                 Environment.ExitCode = innerException.HResult;
+            }
+            catch(Exception e)
+            {
+                Logger.Fatal(e.Message, e);
+                Environment.ExitCode = e.HResult;
             }
             finally
             {
