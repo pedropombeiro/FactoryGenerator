@@ -141,7 +141,7 @@
         {
             var factoryMethodParameters = factoryMethodSymbol.Parameters;
             var instanceConstructors = concreteClassSymbol.InstanceConstructors
-                                                          .Where(c => c.DeclaredAccessibility == Accessibility.Public)
+                                                          .Where(c => c.DeclaredAccessibility == Accessibility.Public || c.DeclaredAccessibility == Accessibility.Internal)
                                                           .ToArray();
 
             try
