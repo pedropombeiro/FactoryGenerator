@@ -1,62 +1,77 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
-    <metadata>
-        <id>DeveloperInTheFlow.FactoryGenerator</id>
-        <version>3.3.0</version>
-        <title>Factory Generator (Roslyn)</title>
-        <authors>Pedro Pombeiro,Daniel Romero,Benjamin Burgy</authors>
-        <owners>Pedro Pombeiro</owners>
-        <requireLicenseAcceptance>false</requireLicenseAcceptance>
-        <developmentDependency>true</developmentDependency>
-        <description>Console application that automatically generates factory implementations for classes marked with [GenerateFactory] attribute, by using Roslyn C# Compiler-as-a-Service. New files named &lt;TargetClass&gt;Factory.Generated.cs are added to the project.
+	<metadata>
+		<id>DeveloperInTheFlow.FactoryGenerator</id>
+		<version>3.4.0</version>
+		<title>Factory Generator (Roslyn)</title>
+		<authors>Pedro Pombeiro,Daniel Romero,Benjamin Burgy</authors>
+		<owners>Pedro Pombeiro</owners>
+		<requireLicenseAcceptance>false</requireLicenseAcceptance>
+		<developmentDependency>true</developmentDependency>
+		<description>
+			Console application that automatically generates factory implementations for classes marked with [GenerateFactory] attribute, by using Roslyn C# Compiler-as-a-Service. New files named &lt;TargetClass&gt;Factory.Generated.cs are added to the project.
 
-Can be used in a build server environment.</description>
-        <releaseNotes>- Add possibility to specify a C# script for transforming the model before the template rendering.
-- Add possibility to specify a template for factory generation.
-- Fix incorrect factory method generation for classes containing multiple constructors.</releaseNotes>
-        <copyright>Copyright © Pedro Pombeiro 2015</copyright>
-        <tags>factories Roslyn C#</tags>
-    </metadata>
-    <files>
-        <file src="..\bin\Release\DefaultTemplate.render" target="tools\DefaultTemplate.render" />
-        <file src="..\bin\Release\FactoryGenerator.exe" target="tools\FactoryGenerator.exe" />
-        <file src="..\bin\Release\FactoryGenerator.exe.config" target="tools\FactoryGenerator.exe.config" />
-        <file src="..\bin\Release\CommandLine.dll" target="tools\" />
-        <file src="..\bin\Release\Common.Logging.Core.dll" target="tools\" />
-        <file src="..\bin\Release\Common.Logging.dll" target="tools\" />
-        <file src="..\bin\Release\Common.Logging.NLog41.dll" target="tools\" />
-        <file src="..\bin\Release\CSScriptLibrary.dll" target="tools\" />
-        <file src="..\bin\Release\Esent.Interop.dll" target="tools\" />
-        <file src="..\bin\Release\Humanizer.dll" target="tools\" />
-        <file src="..\bin\Release\Microsoft.Build.Locator.dll" target="tools\" />
-        <file src="..\bin\Release\Microsoft.CodeAnalysis.CSharp.dll" target="tools\" />
-        <file src="..\bin\Release\Microsoft.CodeAnalysis.CSharp.Features.dll" target="tools\" />
-        <file src="..\bin\Release\Microsoft.CodeAnalysis.CSharp.Scripting.dll" target="tools\" />
-        <file src="..\bin\Release\Microsoft.CodeAnalysis.CSharp.Workspaces.dll" target="tools\" />
-        <file src="..\bin\Release\Microsoft.CodeAnalysis.dll" target="tools\" />
-        <file src="..\bin\Release\Microsoft.CodeAnalysis.Features.dll" target="tools\" />
-        <file src="..\bin\Release\Microsoft.CodeAnalysis.Scripting.dll" target="tools\" />
-        <file src="..\bin\Release\Microsoft.CodeAnalysis.VisualBasic.dll" target="tools\" />
-        <file src="..\bin\Release\Microsoft.CodeAnalysis.VisualBasic.Features.dll" target="tools\" />
-        <file src="..\bin\Release\Microsoft.CodeAnalysis.VisualBasic.Workspaces.dll" target="tools\" />
-        <file src="..\bin\Release\Microsoft.CodeAnalysis.Workspaces.Desktop.dll" target="tools\" />
-        <file src="..\bin\Release\Microsoft.CodeAnalysis.Workspaces.dll" target="tools\" />
-        <file src="..\bin\Release\Mono.CSharp.dll" target="tools\" />
-        <file src="..\bin\Release\Mono.Posix.dll" target="tools\" />
-        <file src="..\bin\Release\Newtonsoft.Json.dll" target="tools\" />
-        <file src="..\bin\Release\NLog.dll" target="tools\" />
-        <file src="..\bin\Release\Nustache.Core.dll" target="tools\" />
-        <file src="..\bin\Release\System.Collections.Immutable.dll" target="tools\" />
-        <file src="..\bin\Release\System.Composition.AttributedModel.dll" target="tools\" />
-        <file src="..\bin\Release\System.Composition.Convention.dll" target="tools\" />
-        <file src="..\bin\Release\System.Composition.Hosting.dll" target="tools\" />
-        <file src="..\bin\Release\System.Composition.Runtime.dll" target="tools\" />
-        <file src="..\bin\Release\System.Composition.TypedParts.dll" target="tools\" />
-        <file src="..\bin\Release\System.Reflection.Metadata.dll" target="tools\" />
-        <file src="..\bin\Release\System.Reflection.TypeExtensions.dll" target="tools\" />
-        <file src="..\bin\Release\System.Text.Encoding.CodePages.dll" target="tools\" />
-        <file src="..\bin\Release\System.ValueTuple.dll" target="tools\" />
-        <file src="tools\init.ps1" target="tools\init.ps1" />
-        <file src="ThirdPartyNotices.rtf" target="ThirdPartyNotices.rtf" />
-    </files>
+			Can be used in a build server environment.
+		</description>
+		<releaseNotes>Support SDK style projects and generate a file with hashes to speed up regeneration.</releaseNotes>
+		<copyright>Copyright © Pedro Pombeiro 2015</copyright>
+		<tags>factories Roslyn C#</tags>
+	</metadata>
+	<files>
+		<file src="..\bin\Release\net48\DefaultTemplate.render" target="tools\DefaultTemplate.render" />
+		<file src="..\bin\Release\net48\FactoryGenerator.exe" target="tools\FactoryGenerator.exe" />
+		<file src="..\bin\Release\net48\FactoryGenerator.exe.config" target="tools\FactoryGenerator.exe.config" />
+		<file src="..\bin\Release\net48\CommandLine.dll" target="tools\" />
+		<file src="..\bin\Release\net48\Common.Logging.Core.dll" target="tools\" />
+		<file src="..\bin\Release\net48\Common.Logging.dll" target="tools\" />
+		<file src="..\bin\Release\net48\Common.Logging.NLog41.dll" target="tools\" />
+		<file src="..\bin\Release\net48\CSScriptLib.dll" target="tools\" />
+		<file src="..\bin\Release\net48\CSScriptLibrary.dll" target="tools\" />
+		<file src="..\bin\Release\net48\Humanizer.dll" target="tools\" />
+		<file src="..\bin\Release\net48\Microsoft.Bcl.AsyncInterfaces.dll" target="tools\" />
+		<file src="..\bin\Release\net48\Microsoft.Build.Locator.dll" target="tools\" />
+		<file src="..\bin\Release\net48\Microsoft.CodeAnalysis.CSharp.dll" target="tools\" />
+		<file src="..\bin\Release\net48\Microsoft.CodeAnalysis.CSharp.Scripting.dll" target="tools\" />
+		<file src="..\bin\Release\net48\Microsoft.CodeAnalysis.CSharp.Workspaces.dll" target="tools\" />
+		<file src="..\bin\Release\net48\Microsoft.CodeAnalysis.dll" target="tools\" />
+		<file src="..\bin\Release\net48\Microsoft.CodeAnalysis.Scripting.dll" target="tools\" />
+		<file src="..\bin\Release\net48\Microsoft.CodeAnalysis.VisualBasic.dll" target="tools\" />
+		<file src="..\bin\Release\net48\Microsoft.CodeAnalysis.VisualBasic.Workspaces.dll" target="tools\" />
+		<file src="..\bin\Release\net48\Microsoft.CodeAnalysis.Workspaces.dll" target="tools\" />
+		<file src="..\bin\Release\net48\Microsoft.CodeAnalysis.Workspaces.MSBuild.dll" target="tools\" />
+		<file src="..\bin\Release\net48\Microsoft.Extensions.DependencyModel.dll" target="tools\" />
+		<file src="..\bin\Release\net48\Mono.CSharp.dll" target="tools\" />
+		<file src="..\bin\Release\net48\Newtonsoft.Json.dll" target="tools\" />
+		<file src="..\bin\Release\net48\NLog.dll" target="tools\" />
+		<file src="..\bin\Release\net48\NuGet.Common.dll" target="tools\" />
+		<file src="..\bin\Release\net48\NuGet.Configuration.dll" target="tools\" />
+		<file src="..\bin\Release\net48\NuGet.DependencyResolver.Core.dll" target="tools\" />
+		<file src="..\bin\Release\net48\NuGet.Frameworks.dll" target="tools\" />
+		<file src="..\bin\Release\net48\NuGet.LibraryModel.dll" target="tools\" />
+		<file src="..\bin\Release\net48\NuGet.Packaging.dll" target="tools\" />
+		<file src="..\bin\Release\net48\NuGet.ProjectModel.dll" target="tools\" />
+		<file src="..\bin\Release\net48\NuGet.Protocol.dll" target="tools\" />
+		<file src="..\bin\Release\net48\NuGet.Versioning.dll" target="tools\" />
+		<file src="..\bin\Release\net48\Nustache.Core.dll" target="tools\" />
+		<file src="..\bin\Release\net48\System.Buffers.dll" target="tools\" />
+		<file src="..\bin\Release\net48\System.Collections.Immutable.dll" target="tools\" />
+		<file src="..\bin\Release\net48\System.Composition.AttributedModel.dll" target="tools\" />
+		<file src="..\bin\Release\net48\System.Composition.Convention.dll" target="tools\" />
+		<file src="..\bin\Release\net48\System.Composition.Hosting.dll" target="tools\" />
+		<file src="..\bin\Release\net48\System.Composition.Runtime.dll" target="tools\" />
+		<file src="..\bin\Release\net48\System.Composition.TypedParts.dll" target="tools\" />
+		<file src="..\bin\Release\net48\System.IO.Pipelines.dll" target="tools\" />
+		<file src="..\bin\Release\net48\System.Memory.dll" target="tools\" />
+		<file src="..\bin\Release\net48\System.Numerics.Vectors.dll" target="tools\" />
+		<file src="..\bin\Release\net48\System.Reflection.Metadata.dll" target="tools\" />
+		<file src="..\bin\Release\net48\System.Reflection.TypeExtensions.dll" target="tools\" />
+		<file src="..\bin\Release\net48\System.Runtime.CompilerServices.Unsafe.dll" target="tools\" />
+		<file src="..\bin\Release\net48\System.Text.Encoding.CodePages.dll" target="tools\" />
+		<file src="..\bin\Release\net48\System.Text.Encodings.Web.dll" target="tools\" />
+		<file src="..\bin\Release\net48\System.Text.Json.dll" target="tools\" />
+		<file src="..\bin\Release\net48\System.Threading.Tasks.Extensions.dll" target="tools\" />
+		<file src="..\bin\Release\net48\System.ValueTuple.dll" target="tools\" />
+		<file src="tools\init.ps1" target="tools\init.ps1" />
+		<file src="ThirdPartyNotices.rtf" target="ThirdPartyNotices.rtf" />
+	</files>
 </package>
