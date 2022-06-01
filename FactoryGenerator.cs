@@ -97,15 +97,20 @@
 			var projectCount = this.solution.Projects.Count();
 			var existingFactoriesTasksList = new List<Task<ICollection<string>>>(projectCount);
 			var generatedFactoriesTasksList = new List<Task<ICollection<string>>>(projectCount);
+
+            Dictionary<string, bool> isSdkStyleProjectDict = new Dictionary<string, bool>();
+
 			foreach (var projectId in projectDependencyGraph.GetTopologicallySortedProjects())
 			{
 				var project = this.solution.GetProject(projectId);
 				var compilation = await project.GetCompilationAsync().ConfigureAwait(false);
+                var isSdkStyleProject = await IsSdkStyleProjectAsync(project.FilePath).ConfigureAwait(false);
+                isSdkStyleProjectDict[project.FilePath] = isSdkStyleProject;
 
 				Logger.InfoFormat("Processing {0}...", project.Name);
 
 				var catalogTask = CatalogGeneratedFactoriesInProjectAsync(compilation);
-				var generateFactoriesTask = this.GenerateFactoriesInProjectAsync(compilation);
+				var generateFactoriesTask = this.GenerateFactoriesInProjectAsync(compilation, isSdkStyleProject);
 
 				existingFactoriesTasksList.Add(catalogTask);
 				generatedFactoriesTasksList.Add(generateFactoriesTask);
@@ -116,9 +121,9 @@
 			var existingGeneratedFactoryFilePaths = existingFactoriesTasksList.SelectMany(task => task.Result).ToArray();
 			var generatedFactoryFilePaths = generatedFactoriesTasksList.SelectMany(task => task.Result).ToArray();
 
-			var newFactoryFilePaths = generatedFactoryFilePaths.Except(existingGeneratedFactoryFilePaths).ToArray();
-			var obsoleteFactoryFilePaths = existingGeneratedFactoryFilePaths.Except(generatedFactoryFilePaths).ToArray();
-			this.RemoveObsoleteFactoriesFromSolution(obsoleteFactoryFilePaths);
+			var newFactoryFilePaths = generatedFactoryFilePaths.Except(existingGeneratedFactoryFilePaths, StringComparer.InvariantCultureIgnoreCase).ToArray();
+			var obsoleteFactoryFilePaths = existingGeneratedFactoryFilePaths.Except(generatedFactoryFilePaths, StringComparer.InvariantCultureIgnoreCase).ToArray();
+			this.RemoveObsoleteFactoriesFromSolution(obsoleteFactoryFilePaths, isSdkStyleProjectDict);
 
 			this.workspace.TryApplyChanges(this.solution);
 
@@ -130,6 +135,22 @@
 		#endregion
 
 		#region Methods
+
+        private static async Task<bool> IsSdkStyleProjectAsync(
+            string path)
+        {
+            using var streamReader = new StreamReader(File.OpenRead(path));
+            while (true)
+            {
+                var line = await streamReader.ReadLineAsync().ConfigureAwait(false);
+                if (line.Contains("<Project"))
+                {
+                    return line.Contains("Sdk=\"Microsoft.NET.Sdk");
+                }
+            }
+
+            throw new NotSupportedException($"Not able to detect project style for {path}!");
+        }
 
 		private static async Task<ICollection<string>> CatalogGeneratedFactoriesInProjectAsync(
 			Compilation compilation)
@@ -266,7 +287,7 @@
 			       .Add(factoryInterfaceTypeSymbol)
 			       .SelectMany(i => i.GetMembers().OfType<IMethodSymbol>())
 			       .Select(methodSymbol => (returnType: ResolveGenericArgument(factoryInterfaceTypeSymbol, methodSymbol.ReturnType, genericArgumentTypeSymbols), symbol: methodSymbol))
-			       .Where(methodSymbol => concreteClassTypeSymbol.AllInterfaces.Select(i => i.OriginalDefinition).Contains(methodSymbol.returnType.OriginalDefinition))
+			       .Where(methodSymbol => concreteClassTypeSymbol.AllInterfaces.Select(i => i.OriginalDefinition).Contains(methodSymbol.returnType.OriginalDefinition, SymbolEqualityComparer.Default))
 			       .ToArray();
 		}
 
@@ -379,17 +400,17 @@
 			return @out;
 		}
 
-		private static void UpdateDocument(
-			Document document,
+		private static void WriteFile(
+			string filePath,
 			string newText)
 		{
 			// Small hack to force files to be saved without changing encoding (Roslyn is currently saving files in Windows 1252 codepage).
-			if (File.Exists(document.FilePath))
+			if (File.Exists(filePath))
 			{
 				string originalText;
 				Encoding originalEncoding;
 
-				using (var streamReader = new StreamReader(document.FilePath, Encoding.Default))
+				using (var streamReader = new StreamReader(filePath, Encoding.Default))
 				{
 					originalText = streamReader.ReadToEnd();
 
@@ -398,17 +419,18 @@
 
 				if (!newText.Equals(originalText))
 				{
-					File.WriteAllText(document.FilePath, newText, originalEncoding);
+					File.WriteAllText(filePath, newText, originalEncoding);
 				}
 			}
 			else
 			{
-				File.WriteAllText(document.FilePath, newText, Encoding.UTF8);
+				File.WriteAllText(filePath, newText, Encoding.UTF8);
 			}
 		}
 
 		private async Task<ICollection<string>> GenerateFactoriesInProjectAsync(
-			Compilation compilation)
+            Compilation compilation,
+            bool isSdkStyleProject)
 		{
 			var generatedFactoriesList = new List<string>();
 
@@ -431,7 +453,7 @@
 						var fullyQualifiedMetadataName = GetDeclarationFullName(classDeclarationSyntax);
 						var resolvedConcreteClassType = compilation.GetTypeByMetadataName(fullyQualifiedMetadataName);
 
-						var generatedFilePath = this.GenerateFactoryForClass(classDeclarationSyntax, resolvedConcreteClassType, compilation);
+						var generatedFilePath = this.GenerateFactoryForClass(classDeclarationSyntax, resolvedConcreteClassType, compilation, isSdkStyleProject);
 						generatedFactoriesList.Add(generatedFilePath);
 
 						Logger.Debug(new string('-', 80));
@@ -443,9 +465,10 @@
 		}
 
 		private string GenerateFactoryForClass(
-			ClassDeclarationSyntax concreteClassDeclarationSyntax,
-			INamedTypeSymbol concreteClassTypeSymbol,
-			Compilation compilation)
+            ClassDeclarationSyntax concreteClassDeclarationSyntax,
+            INamedTypeSymbol concreteClassTypeSymbol,
+            Compilation compilation,
+            bool isSdkStyleProject)
 		{
 			var factoryAttribute = GetFactoryAttributeFromClassDeclaration(concreteClassDeclarationSyntax);
 
@@ -511,13 +534,14 @@
 
 			Logger.InfoFormat("Rendering factory implementation {0}\r\n\tfor factory interface {1}\r\n\ttargeting {2}...", factoryClassGenericName, factoryInterfaceFullName, GetDeclarationFullName(concreteClassDeclarationSyntax));
 
-			var generatedFilePath = this.RenderFactoryImplementation(concreteClassDeclarationSyntax, concreteClassTypeSymbol, factoryInterfaceTypeSymbol, GetSafeFileName(factoryClassGenericName), genericArgumentTypeSymbols);
+			var generatedFilePath = this.RenderFactoryImplementation(concreteClassDeclarationSyntax, concreteClassTypeSymbol, factoryInterfaceTypeSymbol, GetSafeFileName(factoryClassGenericName), genericArgumentTypeSymbols, isSdkStyleProject);
 
 			return generatedFilePath;
 		}
 
 		private void RemoveObsoleteFactoriesFromSolution(
-			string[] obsoleteFactoryFilePaths)
+            string[] obsoleteFactoryFilePaths,
+            Dictionary<string, bool> isSdkStyleProjectDict)
 		{
 			if (obsoleteFactoryFilePaths.Length == 0)
 			{
@@ -531,23 +555,26 @@
 			foreach (var obsoleteFactoryFilePath in obsoleteFactoryFilePaths)
 			{
 				var obsoleteFactoryDocument = FindDocumentFromPath(newSolution, obsoleteFactoryFilePath);
-				var newProject = obsoleteFactoryDocument.Project.RemoveDocument(obsoleteFactoryDocument.Id);
+                if (!isSdkStyleProjectDict[obsoleteFactoryDocument.Project.FilePath])
+                {
+                    var newProject = obsoleteFactoryDocument.Project.RemoveDocument(obsoleteFactoryDocument.Id);
+                    newSolution = newProject.Solution;
+				}				
 
-				Logger.InfoFormat("{0} from {1}.", Path.GetFileName(obsoleteFactoryFilePath), newProject.Name);
+				Logger.InfoFormat("{0} from {1}.", Path.GetFileName(obsoleteFactoryFilePath), obsoleteFactoryDocument.Project.Name);
 				File.Delete(obsoleteFactoryFilePath);
-
-				newSolution = newProject.Solution;
 			}
 
 			Interlocked.Exchange(ref this.solution, newSolution);
 		}
 
 		private string RenderFactoryImplementation(
-			ClassDeclarationSyntax concreteClassDeclarationSyntax,
-			INamedTypeSymbol concreteClassTypeSymbol,
-			INamedTypeSymbol factoryInterfaceTypeSymbol,
-			string factoryName,
-			INamedTypeSymbol[] genericArgumentTypeSymbols)
+            ClassDeclarationSyntax concreteClassDeclarationSyntax,
+            INamedTypeSymbol concreteClassTypeSymbol,
+            INamedTypeSymbol factoryInterfaceTypeSymbol,
+            string factoryName,
+            INamedTypeSymbol[] genericArgumentTypeSymbols,
+            bool isSdkStyleProject)
 		{
 			var fileName = "{0}.Generated.cs".FormatWith(factoryName);
 			var factoryInterfaceName = factoryInterfaceTypeSymbol.Name;
@@ -573,11 +600,13 @@
 			var constructorParametersUsingSelfType = allConstructorParameters.Where(p => p.Type.Name == factoryInterfaceTypeSymbol.Name).ToArray();
 			var constructorParametersWithoutSelfType = allConstructorParameters.Except(constructorParametersUsingSelfType)
 			                                                                   .ToArray();
-			var injectedParameters = (from parameter in (IEnumerable<IParameterSymbol>)constructorParametersWithoutSelfType
+#pragma warning disable RS1024 // Symbols should be compared for equality
+            var injectedParameters = (from parameter in (IEnumerable<IParameterSymbol>)constructorParametersWithoutSelfType
 			                          where !allContractMethodParameters.Any(contractMethodParameter => CompareParameters(contractMethodParameter, parameter))
 			                          select parameter).Distinct(new ParameterEqualityComparer()).ToArray();
+#pragma warning restore RS1024 // Symbols should be compared for equality
 
-			var concreteClassName = GetXmlDocSafeTypeName(concreteClassTypeSymbol.ToString());
+            var concreteClassName = GetXmlDocSafeTypeName(concreteClassTypeSymbol.ToString());
 			var @namespace = GetDeclarationNamespaceFullName(concreteClassDeclarationSyntax);
 
 			var generateCodeArguments = new[] { new Value("\"DeveloperInTheFlow.FactoryGenerator\"", false), new Value(string.Format("\"{0}\"", this.version), true) };
@@ -651,28 +680,30 @@
 				model = Transform(json, transformationScript);
 			}
 
+            var isNew = project.Documents.SingleOrDefault(doc => doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase) && doc.Folders.SequenceEqual(typeDeclarationDocument.Folders));
+
 			// The result of the generator
-			var factoryResult = factoryGeneratorEngine.Generate(fileName, typeDeclarationDocument.Folders, model, factoryFile.FactoryFor);
+			var factoryResult = factoryGeneratorEngine.Generate(fileName, model, factoryFile.FactoryFor);
 
-			var existingDocument = project.Documents.SingleOrDefault(doc => doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase) && doc.Folders.SequenceEqual(typeDeclarationDocument.Folders));
-
-			if (existingDocument != null)
-			{
-				UpdateDocument(existingDocument, factoryResult.Code);
-
-				return existingDocument.FilePath;
-			}
-
-			this.solution = factoryResult.Document.Project.Solution;
+            if (!isSdkStyleProject)
+            {
+                if (!project.Documents.Any(doc => doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase) && doc.Folders.SequenceEqual(typeDeclarationDocument.Folders)))
+                {
+					var document = project.AddDocument(fileName, factoryResult.Code, typeDeclarationDocument.Folders);
+                    this.solution = document.Project.Solution;
+                }
+            }
 
 			var projectFolder = Path.GetDirectoryName(project.FilePath);
-			if (projectFolder == null)
-			{
-				throw new InvalidOperationException("Cannot determines the folder path of the project.");
-			}
+            if (projectFolder == null)
+            {
+                throw new InvalidOperationException("Cannot determines the folder path of the project.");
+            }
 
-			var generatedFileFolderPath = Path.Combine(projectFolder, string.Join(@"\", typeDeclarationDocument.Folders));
-			var generatedFilePath = Path.Combine(generatedFileFolderPath, factoryResult.Document.Name);
+            var generatedFileFolderPath = Path.Combine(projectFolder, string.Join(@"\", typeDeclarationDocument.Folders));
+            var generatedFilePath = Path.Combine(generatedFileFolderPath, fileName);
+
+			WriteFile(generatedFilePath, factoryResult.Code);
 
 			return generatedFilePath;
 		}

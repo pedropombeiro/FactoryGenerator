@@ -10,6 +10,7 @@
 
     using Common.Logging;
     using Microsoft.Build.Locator;
+    using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.MSBuild;
 
     using NLog.Config;
@@ -47,6 +48,15 @@
                                                          string templatePath)
         {
             var workspace = MSBuildWorkspace.Create();
+            workspace.WorkspaceFailed += (o, e) =>
+                                         {
+                                             if (e.Diagnostic.Kind == WorkspaceDiagnosticKind.Failure
+                                                 // related to WPF
+                                                 && !e.Diagnostic.Message.Contains("Microsoft.WinFx.targets"))
+                                             {
+                                                 Console.WriteLine(e.Diagnostic.Message);
+                                             }
+                                         };
             var solution = await workspace.OpenSolutionAsync(solutionPath);
 
             var factoryGenerator = new FactoryGenerator(workspace, solution, attributeImportList, writeXmlDoc, templatePath);
@@ -69,8 +79,9 @@
                 var vsInstances = MSBuildLocator.QueryVisualStudioInstances();
                 var vs2017 = vsInstances.FirstOrDefault(x => x.Version.Major == 15);
                 var vs2019 = vsInstances.FirstOrDefault(x => x.Version.Major == 16);
+                var vs2022 = vsInstances.FirstOrDefault(x => x.Version.Major == 17);
 
-                VisualStudioInstance usedInstance = vs2019 ?? vs2017;
+                VisualStudioInstance usedInstance = vs2022 ?? vs2019 ?? vs2017;
                 if (usedInstance == null)
                     throw new Exception("Could not find VS 2019 or VS 2017 installation");
                 MSBuildLocator.RegisterInstance(usedInstance);
