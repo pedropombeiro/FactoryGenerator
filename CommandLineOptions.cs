@@ -22,6 +22,9 @@
         [Option('d', "doc", Required = false, HelpText = "Import XML documentation into generated factories", Default = false)]
         public bool WriteXmlDoc { get; set; }
 
+        [Option('f', "force", Required = false, HelpText = "Force regeneration, don't check file hashes", Default = false)]
+        public bool ForceGeneration { get; set; }
+
         #endregion
     }
 }

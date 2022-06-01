@@ -42,10 +42,12 @@
 
         #region Methods
 
-        private static async Task GenerateFactoriesAsync(string solutionPath,
-                                                         IEnumerable<string> attributeImportList,
-                                                         bool writeXmlDoc,
-                                                         string templatePath)
+        private static async Task GenerateFactoriesAsync(
+            string solutionPath,
+            IEnumerable<string> attributeImportList,
+            bool writeXmlDoc,
+            string templatePath,
+            bool forceGeneration)
         {
             var workspace = MSBuildWorkspace.Create();
             workspace.WorkspaceFailed += (o, e) =>
@@ -54,12 +56,12 @@
                                                  // related to WPF
                                                  && !e.Diagnostic.Message.Contains("Microsoft.WinFx.targets"))
                                              {
-                                                 Console.WriteLine(e.Diagnostic.Message);
+                                                 Logger.ErrorFormat("Error: {0}", e.Diagnostic.Message);
                                              }
                                          };
             var solution = await workspace.OpenSolutionAsync(solutionPath);
 
-            var factoryGenerator = new FactoryGenerator(workspace, solution, attributeImportList, writeXmlDoc, templatePath);
+            var factoryGenerator = new FactoryGenerator(workspace, solution, attributeImportList, writeXmlDoc, templatePath, forceGeneration);
 
             await factoryGenerator.ExecuteAsync();
         }
@@ -89,7 +91,8 @@
                 GenerateFactoriesAsync(CommandLineOptions.SolutionPath,
                                        CommandLineOptions.AttributeImportList.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries),
                                        CommandLineOptions.WriteXmlDoc,
-                                       CommandLineOptions.TemplatePath)
+                                       CommandLineOptions.TemplatePath,
+                                       CommandLineOptions.ForceGeneration)
                     .Wait();
             }
             catch (AggregateException e)

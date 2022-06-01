@@ -43,26 +43,16 @@
         /// <summary>
         ///     Generates the factory as <see cref="Document"/>.
         /// </summary>
-        /// <param name="fileName">
-        ///     The file name of the factory.
-        /// </param>
-        /// <param name="folders">
-        ///     Folders list.
-        /// </param>
         /// <param name="model">
         ///     Model representing the factory.
         /// </param>
         /// <param name="factoryFor">
         ///     The template name of the factory that will be used of generating the factory.
         /// </param>
-        /// <param name="isSdkStyleProject">
-        ///     Whether this is an sdk style project where the file doesn't need to be added to the csproj.
-        /// </param>
         /// <returns>
         ///     The <see cref="Document"/> representing the factory file.
         /// </returns>
-        public FactorGeneratoryResult Generate(string fileName,
-                                               object model,
+        public FactorGeneratoryResult Generate(object model,
                                                string factoryFor)
         {
             var template = this.ResolveTemplatePath(factoryFor);
