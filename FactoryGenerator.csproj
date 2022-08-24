@@ -31,6 +31,8 @@
 		<PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Workspaces" Version="4.2.0" />
 		<PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.2.0" />
 
+		<!-- Update of System.Memory in https://github.com/dotnet/msbuild/pull/7680 -->
+		<PackageReference Include="System.Memory" Version="4.5.5" />
 		<!-- NOTE: A lot of MSBuild tasks that we are going to load in order to analyze a project file will implicitly
                load build tasks that will require Newtonsoft.Json version 9. Since there is no way for us to ambiently 
                pick these dependencies up like with MSBuild assemblies we explicitly reference it here. -->
