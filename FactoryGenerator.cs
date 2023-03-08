@@ -58,6 +58,14 @@
 
         private readonly Workspace workspace;
 
+        private Lazy<IEvaluator> csscriptEvaluator = new(() =>
+                                                         {
+                                                             CSScript.EvaluatorConfig.RefernceDomainAsemblies = false;
+                                                             return CSScript.Evaluator.ReferenceAssembly(typeof(JObject).Assembly)
+                                                                            .ReferenceAssembly(typeof(System.Linq.Enumerable).Assembly)
+                                                                            .ReferenceAssembly(typeof(System.Text.RegularExpressions.Regex).Assembly);
+                                                         });
+
         private Solution solution;
 
         #endregion
@@ -406,11 +414,11 @@
             }
         }
 
-        private static JObject Transform(
+        private JObject Transform(
             JObject factoryFile,
             string transformationScriptPath)
         {
-            dynamic script = CSScript.Evaluator.LoadFile(transformationScriptPath);
+            dynamic script = this.csscriptEvaluator.Value.LoadFile(transformationScriptPath);
             var @out = script.Transform(factoryFile);
 
             return @out;
@@ -745,7 +753,7 @@
             if (File.Exists(transformationScript))
             {
                 var json = JObject.FromObject(factoryFile);
-                model = Transform(json, transformationScript);
+                model = this.Transform(json, transformationScript);
             }
 
             var projectFolder = Path.GetDirectoryName(project.FilePath);
