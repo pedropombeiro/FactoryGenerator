@@ -242,7 +242,7 @@
         private static string GetDeclarationNamespaceFullName(
             CSharpSyntaxNode typeDeclarationSyntax)
         {
-            var namespaceDeclarationSyntax = typeDeclarationSyntax.FirstAncestorOrSelf<NamespaceDeclarationSyntax>();
+            var namespaceDeclarationSyntax = typeDeclarationSyntax.FirstAncestorOrSelf<BaseNamespaceDeclarationSyntax>();
             return namespaceDeclarationSyntax.Name.ToString();
         }
 
@@ -661,7 +661,7 @@
 
             var usingsToFilterOut = new[] { concreteClassTypeSymbol.ContainingNamespace.ToString() };
             var outerUsingDeclarations = FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<CompilationUnitSyntax>().Usings, usingsToFilterOut);
-            var innerUsingDeclarations = FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<NamespaceDeclarationSyntax>().Usings, usingsToFilterOut);
+            var innerUsingDeclarations = FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<BaseNamespaceDeclarationSyntax>().Usings, usingsToFilterOut);
 
             var factoryInterfaceMethods = GetSuitableFactoryInterfaceMethods(concreteClassTypeSymbol, factoryInterfaceTypeSymbol, genericArgumentTypeSymbols);
 
