@@ -131,7 +131,7 @@
                 Logger.InfoFormat("Processing {0}...", project.Name);
 
                 var catalogTask = CatalogGeneratedFactoriesInProjectAsync(compilation);
-                var generateFactoriesTask = this.GenerateFactoriesInProjectAsync(compilation, isSdkStyleProject, fileHashesPerProject);
+                var generateFactoriesTask = this.GenerateFactoriesInProjectAsync(compilation, isSdkStyleProject, fileHashesPerProject, project);
 
                 existingFactoriesTasksList.Add(catalogTask);
                 generatedFactoriesTasksList.Add(generateFactoriesTask);
@@ -457,7 +457,8 @@
         private async Task<ICollection<string>> GenerateFactoriesInProjectAsync(
             Compilation compilation,
             bool isSdkStyleProject,
-            Dictionary<string, Dictionary<string, string>> fileHashesPerProject)
+            Dictionary<string, Dictionary<string, string>> fileHashesPerProject,
+            Project project)
         {
             var generatedFactoriesList = new List<string>();
 
@@ -477,7 +478,12 @@
                         var fullyQualifiedMetadataName = GetDeclarationFullName(classDeclarationSyntax);
                         var resolvedConcreteClassType = compilation.GetTypeByMetadataName(fullyQualifiedMetadataName);
 
-                        var (generatedFilePath, generated) = this.GenerateFactoryForClass(classDeclarationSyntax, resolvedConcreteClassType, compilation, isSdkStyleProject, fileHashesPerProject);
+                        var result = this.GenerateFactoryForClass(classDeclarationSyntax, resolvedConcreteClassType, compilation, isSdkStyleProject, fileHashesPerProject, project);
+
+                        if (result is null)
+                            continue;
+
+                        var (generatedFilePath, generated) = result.Value;
                         generatedFactoriesList.Add(generatedFilePath);
 
                         if (generated)
@@ -491,12 +497,13 @@
             return generatedFactoriesList;
         }
 
-        private (string, bool) GenerateFactoryForClass(
+        private (string, bool)? GenerateFactoryForClass(
             ClassDeclarationSyntax concreteClassDeclarationSyntax,
             INamedTypeSymbol concreteClassTypeSymbol,
             Compilation compilation,
             bool isSdkStyleProject,
-            Dictionary<string, Dictionary<string, string>> fileHashesPerProject)
+            Dictionary<string, Dictionary<string, string>> fileHashesPerProject,
+            Project project)
         {
             var factoryAttribute = GetFactoryAttributeFromClassDeclaration(concreteClassDeclarationSyntax);
 
@@ -561,13 +568,19 @@
             var factoryClassGenericName = GetFactoryClassGenericName(concreteClassDeclarationSyntax, factoryInterfaceTypeSymbol);
             var factoryInterfaceFullName = factoryInterfaceTypeSymbol.ToString();
 
-            var (project, typeDeclarationDocument) = this.solution.Projects.Select(proj => (proj, doc: proj.GetDocument(concreteClassDeclarationSyntax.SyntaxTree))).First(t => t.doc != null);
+            var typeDeclarationDocument = project.GetDocument(concreteClassDeclarationSyntax.SyntaxTree);
 
             var folders = string.Join(@"\", typeDeclarationDocument.Folders);
             var safeFileName = GetSafeFileName(factoryClassGenericName);
             var fileName = "{0}.Generated.cs".FormatWith(safeFileName);
             var generatedFilePath = Path.Combine(Path.GetDirectoryName(project.FilePath), folders, fileName);
             var relativeFilePath = Path.Combine(folders, typeDeclarationDocument.Name);
+
+            bool IsLinkedFile()
+               => !typeDeclarationDocument.FilePath.StartsWith(Path.GetDirectoryName(project.FilePath), StringComparison.OrdinalIgnoreCase);
+
+            if (IsLinkedFile()) 
+                return null;
 
             using SHA1Managed sha1 = new SHA1Managed();
             var hash = sha1.ComputeHash(File.ReadAllBytes(typeDeclarationDocument.FilePath));
