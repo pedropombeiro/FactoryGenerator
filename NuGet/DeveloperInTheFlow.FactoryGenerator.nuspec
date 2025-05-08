@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
 	<metadata>
 		<id>DeveloperInTheFlow.FactoryGenerator</id>
-		<version>3.7.0</version>
+		<version>3.8.0</version>
 		<title>Factory Generator (Roslyn)</title>
 		<authors>Pedro Pombeiro,Daniel Romero,Benjamin Burgy</authors>
 		<owners>Pedro Pombeiro</owners>
