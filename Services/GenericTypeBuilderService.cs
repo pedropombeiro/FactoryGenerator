@@ -8,8 +8,6 @@
 
     using Microsoft.CodeAnalysis;
 
-    using Mono.CSharp;
-
     /// <summary>
     ///     Service responsible for building the generic type models.
     /// </summary>

@@ -15,34 +15,33 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="CommandLineParser" Version="2.2.1" />
+		<PackageReference Include="CommandLineParser" Version="2.9.1" />
 		<PackageReference Include="Common.Logging.NLog41" Version="3.4.1" />
-		<PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.2.0" />
-		<PackageReference Include="CS-Script" Version="4.6.2" />
-		<PackageReference Include="CS-Script.bin" Version="3.30.5.1" />
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.13.0" />
+		<PackageReference Include="CS-Script" Version="4.9.6" />
 		<PackageReference Include="Humanizer" Version="2.14.1" />
-		<PackageReference Include="NLog" Version="4.5.3" />
-		<PackageReference Include="Nustache" Version="1.16.0.8" />
+		<PackageReference Include="NLog" Version="5.4.0" />
+		<PackageReference Include="Nustache" Version="1.16.0.10" />
 		<!--<PackageReference Include="Microsoft.Build.Framework" Version="17.0.0" />-->
 		<!-- Roslyn packages as taken from https://github.com/HamedFathi/RoslynSolutionAnalyzor -->
-		<PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.3" PrivateAssets="all" IncludeAssets="analyzers" />
-		<PackageReference Include="Microsoft.Build.Locator" Version="1.4.1" />
-		<PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.2.0" />
-		<PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Workspaces" Version="4.2.0" />
-		<PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.2.0" />
+		<PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" PrivateAssets="all" IncludeAssets="analyzers" />
+		<PackageReference Include="Microsoft.Build.Locator" Version="1.9.1" />
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.13.0" />
+		<PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Workspaces" Version="4.13.0" />
+		<PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.13.0" />
 
 		<!-- Update of System.Memory in https://github.com/dotnet/msbuild/pull/7680 -->
-		<PackageReference Include="System.Memory" Version="4.5.5" />
+		<PackageReference Include="System.Memory" Version="4.6.3" />
 		<!-- NOTE: A lot of MSBuild tasks that we are going to load in order to analyze a project file will implicitly
                load build tasks that will require Newtonsoft.Json version 9. Since there is no way for us to ambiently 
                pick these dependencies up like with MSBuild assemblies we explicitly reference it here. -->
-		<PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 		<!-- NOTE: The project that you are trying to load apparently has a requirement on this assembly so we also include
                it in the output directory so it can be picked up. -->
-		<PackageReference Include="NuGet.Frameworks" Version="5.6.0" />
-		<PackageReference Include="NuGet.Versioning" Version="5.6.0" />
-		<PackageReference Include="NuGet.ProjectModel" Version="5.6.0" />
-		<PackageReference Include="System.Collections.Immutable" Version="6.0.0" />
+		<PackageReference Include="NuGet.Frameworks" Version="6.13.2" />
+		<PackageReference Include="NuGet.Versioning" Version="6.13.2" />
+		<PackageReference Include="NuGet.ProjectModel" Version="6.13.2" />
+		<PackageReference Include="System.Collections.Immutable" Version="9.0.4" />
 	</ItemGroup>
 
 	<ItemGroup>

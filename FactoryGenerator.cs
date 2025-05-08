@@ -14,7 +14,7 @@
 
     using Common.Logging;
 
-    using CSScriptLibrary;
+    using CSScriptLib;
 
     using DeveloperInTheFlow.FactoryGenerator.Models;
     using DeveloperInTheFlow.FactoryGenerator.Services;
@@ -29,6 +29,7 @@
     using Newtonsoft.Json.Linq;
 
     using Attribute = DeveloperInTheFlow.FactoryGenerator.Models.Attribute;
+    using Project = Microsoft.CodeAnalysis.Project;
 
     public class FactoryGenerator
     {
@@ -60,7 +61,7 @@
 
         private Lazy<IEvaluator> csscriptEvaluator = new(() =>
                                                          {
-                                                             CSScript.EvaluatorConfig.RefernceDomainAsemblies = false;
+                                                             CSScript.EvaluatorConfig.ReferenceDomainAssemblies = true;
                                                              return CSScript.Evaluator.ReferenceAssembly(typeof(JObject).Assembly)
                                                                             .ReferenceAssembly(typeof(System.Linq.Enumerable).Assembly)
                                                                             .ReferenceAssembly(typeof(System.Text.RegularExpressions.Regex).Assembly);
