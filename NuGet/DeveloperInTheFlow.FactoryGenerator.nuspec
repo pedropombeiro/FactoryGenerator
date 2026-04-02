@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
 	<metadata>
 		<id>DeveloperInTheFlow.FactoryGenerator</id>
-		<version>3.9.2</version>
+		<version>3.9.4</version>
 		<title>Factory Generator (Roslyn)</title>
 		<authors>Pedro Pombeiro,Daniel Romero,Benjamin Burgy</authors>
 		<owners>Pedro Pombeiro</owners>
@@ -23,53 +23,7 @@
 		<file src="..\bin\Release\net48\FactoryGenerator.exe.config" target="tools\FactoryGenerator.exe.config" />
 		<file src="..\bin\Release\net48\BuildHost-net472\**" target="tools\BuildHost-net472\" />
 		<file src="..\bin\Release\net48\BuildHost-netcore\**" target="tools\BuildHost-netcore\" />
-		<file src="..\bin\Release\net48\CommandLine.dll" target="tools\" />
-		<file src="..\bin\Release\net48\Common.Logging.Core.dll" target="tools\" />
-		<file src="..\bin\Release\net48\Common.Logging.dll" target="tools\" />
-		<file src="..\bin\Release\net48\Common.Logging.NLog41.dll" target="tools\" />
-		<file src="..\bin\Release\net48\CSScriptLib.dll" target="tools\" />
-		<file src="..\bin\Release\net48\Humanizer.dll" target="tools\" />
-		<file src="..\bin\Release\net48\Microsoft.Bcl.AsyncInterfaces.dll" target="tools\" />
-		<file src="..\bin\Release\net48\Microsoft.Build.Locator.dll" target="tools\" />
-		<file src="..\bin\Release\net48\Microsoft.CodeAnalysis.CSharp.dll" target="tools\" />
-		<file src="..\bin\Release\net48\Microsoft.CodeAnalysis.CSharp.Scripting.dll" target="tools\" />
-		<file src="..\bin\Release\net48\Microsoft.CodeAnalysis.CSharp.Workspaces.dll" target="tools\" />
-		<file src="..\bin\Release\net48\Microsoft.CodeAnalysis.dll" target="tools\" />
-		<file src="..\bin\Release\net48\Microsoft.CodeAnalysis.Scripting.dll" target="tools\" />
-		<file src="..\bin\Release\net48\Microsoft.CodeAnalysis.VisualBasic.dll" target="tools\" />
-		<file src="..\bin\Release\net48\Microsoft.CodeAnalysis.VisualBasic.Workspaces.dll" target="tools\" />
-		<file src="..\bin\Release\net48\Microsoft.CodeAnalysis.Workspaces.dll" target="tools\" />
-		<file src="..\bin\Release\net48\Microsoft.CodeAnalysis.Workspaces.MSBuild.dll" target="tools\" />
-		<file src="..\bin\Release\net48\Microsoft.Extensions.DependencyModel.dll" target="tools\" />
-		<file src="..\bin\Release\net48\Newtonsoft.Json.dll" target="tools\" />
-		<file src="..\bin\Release\net48\NLog.dll" target="tools\" />
-		<file src="..\bin\Release\net48\NuGet.Common.dll" target="tools\" />
-		<file src="..\bin\Release\net48\NuGet.Configuration.dll" target="tools\" />
-		<file src="..\bin\Release\net48\NuGet.DependencyResolver.Core.dll" target="tools\" />
-		<file src="..\bin\Release\net48\NuGet.Frameworks.dll" target="tools\" />
-		<file src="..\bin\Release\net48\NuGet.LibraryModel.dll" target="tools\" />
-		<file src="..\bin\Release\net48\NuGet.Packaging.dll" target="tools\" />
-		<file src="..\bin\Release\net48\NuGet.ProjectModel.dll" target="tools\" />
-		<file src="..\bin\Release\net48\NuGet.Protocol.dll" target="tools\" />
-		<file src="..\bin\Release\net48\NuGet.Versioning.dll" target="tools\" />
-		<file src="..\bin\Release\net48\Nustache.Core.dll" target="tools\" />
-		<file src="..\bin\Release\net48\System.Buffers.dll" target="tools\" />
-		<file src="..\bin\Release\net48\System.Collections.Immutable.dll" target="tools\" />
-		<file src="..\bin\Release\net48\System.Composition.AttributedModel.dll" target="tools\" />
-		<file src="..\bin\Release\net48\System.Composition.Convention.dll" target="tools\" />
-		<file src="..\bin\Release\net48\System.Composition.Hosting.dll" target="tools\" />
-		<file src="..\bin\Release\net48\System.Composition.Runtime.dll" target="tools\" />
-		<file src="..\bin\Release\net48\System.Composition.TypedParts.dll" target="tools\" />
-		<file src="..\bin\Release\net48\System.IO.Pipelines.dll" target="tools\" />
-		<file src="..\bin\Release\net48\System.Memory.dll" target="tools\" />
-		<file src="..\bin\Release\net48\System.Numerics.Vectors.dll" target="tools\" />
-		<file src="..\bin\Release\net48\System.Reflection.Metadata.dll" target="tools\" />
-		<file src="..\bin\Release\net48\System.Runtime.CompilerServices.Unsafe.dll" target="tools\" />
-		<file src="..\bin\Release\net48\System.Text.Encoding.CodePages.dll" target="tools\" />
-		<file src="..\bin\Release\net48\System.Text.Encodings.Web.dll" target="tools\" />
-		<file src="..\bin\Release\net48\System.Text.Json.dll" target="tools\" />
-		<file src="..\bin\Release\net48\System.Threading.Tasks.Extensions.dll" target="tools\" />
-		<file src="..\bin\Release\net48\System.ValueTuple.dll" target="tools\" />
+		<file src="..\bin\Release\net48\*.dll" target="tools\" />
 		<file src="tools\init.ps1" target="tools\init.ps1" />
 		<file src="ThirdPartyNotices.rtf" target="ThirdPartyNotices.rtf" />
 	</files>

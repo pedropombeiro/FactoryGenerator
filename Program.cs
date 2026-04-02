@@ -97,7 +97,7 @@
                 var vs2022 = vsInstances.FirstOrDefault(x => x.Version.Major == 17);
                 var vs2026 = vsInstances.FirstOrDefault(x => x.Version.Major == 18);
 
-                var usedInstance = vs2026 ?? vs2022 ?? vs2019 ?? vs2017;
+                VisualStudioInstance usedInstance = vs2026 ?? vs2022 ?? vs2019 ?? vs2017;
                 if (usedInstance == null)
                     throw new Exception("Could not find VS2026, VS2022, VS2019 or VS2017 installation");
 
