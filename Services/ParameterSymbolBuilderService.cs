@@ -25,15 +25,20 @@
         ///     The type of the <paramref name="parameterSymbol" /> as <see cref="string"/>.
         /// </returns>
         public string BuildArgumentType(IParameterSymbol parameterSymbol,
-                                        bool isShort)
+                                        bool isShort,
+                                        System.Collections.Generic.ICollection<string> knownNamespaces = null)
         {
             if (!isShort)
             {
                 return parameterSymbol.Type.ToString();
             }
 
-            var shortType = CleanFullType(parameterSymbol);
-            return shortType;
+            // Prefer reading the type name from the syntax (preserves the exact source form).
+            // Fall back to ShortenTypeName when the symbol has no source (metadata-only reference).
+            if (parameterSymbol.DeclaringSyntaxReferences.Length > 0)
+                return CleanFullType(parameterSymbol);
+
+            return FactoryGenerator.ShortenTypeName(parameterSymbol.Type.ToString(), knownNamespaces);
         }
 
         /// <summary>

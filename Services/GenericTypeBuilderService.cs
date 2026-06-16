@@ -1,6 +1,6 @@
 ﻿namespace DeveloperInTheFlow.FactoryGenerator.Services
 {
-    using System;
+    using System.Collections.Immutable;
     using System.Collections.Generic;
     using System.Linq;
 
@@ -25,14 +25,37 @@
 	    /// <returns>
 	    ///     An <see cref="Enumerable"/> of arguments representing generic type.
 	    /// </returns>
-	    public IEnumerable<GenericType> Build(
-		    IEnumerable<ITypeParameterSymbol> typeParameterSymbols,
-		    INamedTypeSymbol[] genericArgumentTypeSymbols = null)
-        {
-            return typeParameterSymbols.Select((x, i) => (i, new GenericType(x.Name, this.GetWhereStatement(x))))
-                                       .Where(t => genericArgumentTypeSymbols?[t.Item1] == null)
-                                       .Select(t => t.Item2);
-        }
+		public IEnumerable<GenericType> Build(
+			IEnumerable<ITypeParameterSymbol> typeParameterSymbols,
+			INamedTypeSymbol[] genericArgumentTypeSymbols = null,
+			ImmutableArray<ITypeParameterSymbol> concreteClassTypeParameters = default)
+		{
+			return typeParameterSymbols.Select((x, i) =>
+										{
+											// Use the concrete class's type parameter constraints at the same
+											// position when the factory interface's type parameter has none,
+											// but always emit the constraint using the factory interface's
+											// type parameter name (x.Name) so the generated code is valid.
+											string whereStatement;
+											if (!concreteClassTypeParameters.IsDefaultOrEmpty
+												&& i < concreteClassTypeParameters.Length
+												&& this.GetWhereStatement(x) == null
+												&& this.GetWhereStatement(concreteClassTypeParameters[i]) != null)
+											{
+												whereStatement = this.GetWhereStatement(concreteClassTypeParameters[i], x.Name);
+											}
+											else
+											{
+												whereStatement = this.GetWhereStatement(x);
+											}
+
+											return (i, new GenericType(x.Name, whereStatement));
+										})
+									   .Where(t => genericArgumentTypeSymbols == null
+												   || t.Item1 >= genericArgumentTypeSymbols.Length
+												   || genericArgumentTypeSymbols[t.Item1] == null)
+									   .Select(t => t.Item2);
+		}
 
         /// <summary>
         ///     Builds a string representing generic types.
@@ -53,9 +76,9 @@
 
         #endregion
 
-        private string GetWhereStatement(ITypeParameterSymbol typeParameterSymbol)
+        private string GetWhereStatement(ITypeParameterSymbol typeParameterSymbol, string nameOverride = null)
         {
-            string result = "where " + typeParameterSymbol.Name + " : ";
+            string result = "where " + (nameOverride ?? typeParameterSymbol.Name) + " : ";
 
              List<string> constraints = new List<string>();
 

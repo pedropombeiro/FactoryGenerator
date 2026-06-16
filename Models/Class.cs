@@ -7,7 +7,7 @@
     {
         #region Fields
 
-        private readonly IEnumerable<GenericType> genericTypes;
+        private readonly GenericType[] genericTypes;
 
         #endregion
 
@@ -25,7 +25,7 @@
                      string inherit,
                      string name)
         {
-            this.genericTypes = genericTypes;
+            this.genericTypes = genericTypes.ToArray();
             this.Attributes = attributes;
             this.ConcreteClassName = concreteClassName;
             this.Constructor = constructor;
@@ -46,6 +46,20 @@
         public Constructor Constructor { get; set; }
 
         public IEnumerable<Field> Fields { get; set; }
+
+        public string WhereClause
+        {
+            get
+            {
+                var constraints = this.genericTypes
+                                      .Select(x => x.Constraints)
+                                      .Where(c => c != null)
+                                      .ToArray();
+                return constraints.Length > 0
+                           ? string.Join("\r\n        ", constraints)
+                           : null;
+            }
+        }
 
         public string GenericTypes
         {

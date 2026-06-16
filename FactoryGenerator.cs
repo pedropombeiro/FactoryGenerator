@@ -63,6 +63,8 @@
 
         private readonly string templatePath;
 
+        private readonly string templateHash;
+
         private readonly string version = FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).ProductVersion;
 
         private readonly Workspace workspace;
@@ -88,6 +90,13 @@
             this.attributeImportList = importList;
             this.templatePath = templatePath;
             this.forceGeneration = forceGeneration;
+
+            using (var sha1 = new SHA1Managed())
+            {
+                var templateBytes = File.ReadAllBytes(templatePath);
+                var hashBytes = sha1.ComputeHash(templateBytes);
+                this.templateHash = BitConverter.ToString(hashBytes).Replace("-", string.Empty);
+            }
 
             var parameterSymbolService = new ParameterSymbolBuilderService();
             var argumentBuilderService = new ArgumentsBuilderService(parameterSymbolService);
@@ -217,17 +226,66 @@
                            .FirstOrDefault(document => document != null);
         }
 
+        /// <summary>
+        ///     Strips namespace prefixes from a fully-qualified type name (including inside generic
+        ///     angle brackets) when that namespace appears in <paramref name="knownNamespaces"/>,
+        ///     producing the shortest name that is unambiguous given the file's using directives.
+        /// </summary>
+        internal static string ShortenTypeName(string typeName, ICollection<string> knownNamespaces)
+        {
+            if (string.IsNullOrEmpty(typeName) || knownNamespaces == null || knownNamespaces.Count == 0)
+                return typeName;
+
+            // Process generics recursively by splitting on top-level ',' inside '<...>'
+            var ltIdx = typeName.IndexOf('<');
+            if (ltIdx >= 0)
+            {
+                var outerPart = typeName.Substring(0, ltIdx);
+                var innerContent = typeName.Substring(ltIdx + 1, typeName.Length - ltIdx - 2);
+                var shortenedOuter = ShortenTypeName(outerPart, knownNamespaces);
+                // Split inner args at top-level commas only
+                var args = new List<string>();
+                var depth = 0;
+                var start = 0;
+                for (var i = 0; i < innerContent.Length; i++)
+                {
+                    var c = innerContent[i];
+                    if (c == '<') depth++;
+                    else if (c == '>') depth--;
+                    else if (c == ',' && depth == 0)
+                    {
+                        args.Add(ShortenTypeName(innerContent.Substring(start, i - start).Trim(), knownNamespaces));
+                        start = i + 1;
+                    }
+                }
+                args.Add(ShortenTypeName(innerContent.Substring(start).Trim(), knownNamespaces));
+                return $"{shortenedOuter}<{string.Join(", ", args)}>";
+            }
+
+            // No generics — strip the longest matching namespace prefix
+            var best = typeName;
+            foreach (var ns in knownNamespaces)
+            {
+                var prefix = ns + ".";
+                if (typeName.StartsWith(prefix, StringComparison.Ordinal))
+                {
+                    var candidate = typeName.Substring(prefix.Length);
+                    // Prefer the shortest result (longest namespace prefix wins)
+                    if (candidate.Length < best.Length)
+                        best = candidate;
+                }
+            }
+            return best;
+        }
+
         private static string GetDeclarationFullName(TypeDeclarationSyntax typeDeclarationSyntax)
         {
             var typeParameterCount = typeDeclarationSyntax.TypeParameterList == null
                                          ? 0
                                          : typeDeclarationSyntax.TypeParameterList.Parameters.Count;
-            var fullyQualifiedName = "{0}.{1}{2}".FormatWith(
-                                                             GetDeclarationNamespaceFullName(typeDeclarationSyntax),
-                                                             typeDeclarationSyntax.Identifier.ValueText,
-                                                             typeParameterCount == 0
-                                                                 ? string.Empty
-                                                                 : "`{0}".FormatWith(typeParameterCount));
+            var fullyQualifiedName = $"{GetDeclarationNamespaceFullName(typeDeclarationSyntax)}.{typeDeclarationSyntax.Identifier.ValueText}{(typeParameterCount == 0
+                                                                                                                                                  ? string.Empty
+                                                                                                                                                  : $"`{typeParameterCount}")}";
 
             return fullyQualifiedName;
         }
@@ -252,7 +310,7 @@
             }
             catch (InvalidOperationException e)
             {
-                throw new InvalidOperationException("Could not read GenerateFactoryAttribute from {0} type.".FormatWith(concreteClassDeclarationSyntax), e);
+                throw new InvalidOperationException($"Could not read GenerateFactoryAttribute from {concreteClassDeclarationSyntax} type.", e);
             }
 
             return factoryAttribute;
@@ -261,7 +319,7 @@
         private static string GetFactoryClassGenericName(ClassDeclarationSyntax concreteTypeDeclarationSyntax,
                                                          INamedTypeSymbol factoryInterfaceTypeSymbol)
         {
-            var factoryClassName = "{0}Factory{1}".FormatWith(concreteTypeDeclarationSyntax.Identifier.ValueText, GetTypeParametersDeclaration(factoryInterfaceTypeSymbol.TypeParameters));
+            var factoryClassName = $"{concreteTypeDeclarationSyntax.Identifier.ValueText}Factory{GetTypeParametersDeclaration(factoryInterfaceTypeSymbol.TypeParameters)}";
 
             return factoryClassName;
         }
@@ -292,7 +350,7 @@
 
             if (typeParameterSymbols.Length > 0)
             {
-                typeParameters = "<{0}>".FormatWith(string.Join(" ,", typeParameterSymbols.Select(t => t.Name)));
+                typeParameters = $"<{string.Join(" ,", typeParameterSymbols.Select(t => t.Name))}>";
             }
 
             return typeParameters;
@@ -339,7 +397,7 @@
             var statisticsFormat = obsoleteFactoryFilePaths.Any() || newFactoryFilePaths.Any()
                                        ? "{0} (+{1}/-{2})"
                                        : "{0}";
-            var factoryStatistics = statisticsFormat.FormatWith("factory".ToQuantity(generatedFactoryFilePaths.Length), newFactoryFilePaths.Length, obsoleteFactoryFilePaths.Length);
+            var factoryStatistics = string.Format(statisticsFormat, "factory".ToQuantity(generatedFactoryFilePaths.Length), newFactoryFilePaths.Length, obsoleteFactoryFilePaths.Length);
 
             Logger.InfoFormat("Generated {0} in {1}.", factoryStatistics, elapsedTime.Humanize(2));
         }
@@ -349,6 +407,11 @@
                                                           INamedTypeSymbol[] genericArgumentTypeSymbols)
         {
             if (methodReturnType is INamedTypeSymbol)
+            {
+                return methodReturnType;
+            }
+
+            if (genericArgumentTypeSymbols.Length == 0)
             {
                 return methodReturnType;
             }
@@ -385,7 +448,7 @@
             }
             catch (InvalidOperationException e)
             {
-                throw new InvalidOperationException("Could not select a constructor from {0} type with the following parameters: ({1}).".FormatWith(concreteClassSymbol.Name, string.Join(", ", factoryMethodParameters.Select(x => x.Name))), e);
+                throw new InvalidOperationException($"Could not select a constructor from {concreteClassSymbol.Name} type with the following parameters: ({string.Join(", ", factoryMethodParameters.Select(x => x.Name))}).", e);
             }
         }
 
@@ -483,27 +546,46 @@
 
                 var namespaces = usings.Concat([GetDeclarationNamespaceFullName(concreteClassDeclarationSyntax)]);
 
-                var typeName = ((TypeOfExpressionSyntax)typeOfArgument.Expression).Type.ToFullString();
+                var typeOfSyntax = (TypeOfExpressionSyntax)typeOfArgument.Expression;
+                var typeName = typeOfSyntax.Type.ToFullString();
 
-                if (typeName.EndsWith(">"))
+                if (typeOfSyntax.Type is GenericNameSyntax genericNameSyntax)
                 {
-                    var genericsPostfix = typeName.Substring(typeName.IndexOf("<", StringComparison.InvariantCulture));
-                    var genericArguments = genericsPostfix.Trim('<', '>').Split(',');
-                    var genericArgumentCount = genericArguments.Length;
+                    var typeArgList = genericNameSyntax.TypeArgumentList.Arguments;
+                    var genericArgumentCount = typeArgList.Count;
 
-                    genericArgumentTypeSymbols = genericArguments.SelectMany(arg => namespaces.Select(ns => $"{ns}.{arg}")
-                                                                                              .Concat([arg])
-                                                                                              .Select(compilation.GetTypeByMetadataName)
-                                                                                              .Where(o => o != null)
-                                                                                              .DefaultIfEmpty(null))
-                                                                 .ToArray();
+                    // Determine whether all type arguments are open placeholders, meaning either:
+                    //   typeof(IFoo<,,>)          — OmittedTypeArgumentSyntax nodes (commas with no names)
+                    //   typeof(IFoo<TState, ...>) — simple identifiers that are the class's own type parameters
+                    // Both represent an unbound generic whose parameters are forwarded from the concrete
+                    // class; don't try to resolve the placeholder names as concrete types.
+                    var classTypeParameterNames = new HashSet<string>(
+                        concreteClassTypeSymbol?.TypeParameters.Select(tp => tp.Name) ?? Enumerable.Empty<string>(),
+                        StringComparer.Ordinal);
 
-                    if (genericArgumentTypeSymbols.Length != genericArgumentCount)
+                    bool IsOpenGenericPlaceholder(TypeSyntax arg)
+                        => arg is OmittedTypeArgumentSyntax                                         // typeof(IFoo<,,>)
+                           || (arg is IdentifierNameSyntax id                                       // typeof(IFoo<TState>)
+                               && classTypeParameterNames.Contains(id.Identifier.ValueText));
+
+                    var isUnboundForwarded = typeArgList.All(IsOpenGenericPlaceholder);
+
+                    if (!isUnboundForwarded)
                     {
-                        throw new InvalidOperationException("Not all generic types for {0} have been found".FormatWith(typeName));
+                        var genericArgumentNames = typeArgList.Select(a => a.ToFullString().Trim()).ToArray();
+                        genericArgumentTypeSymbols = genericArgumentNames
+                                                     .Select(arg => ResolveTypeByName(arg, namespaces, compilation))
+                                                     .ToArray();
+
+                        if (genericArgumentTypeSymbols.Any(s => s == null))
+                        {
+                            throw new InvalidOperationException($"Not all generic types for {typeName} have been found");
+                        }
                     }
 
-                    typeName = typeName.Replace(genericsPostfix, $"`{genericArgumentCount}");
+                    // Build the metadata name directly from the identifier and arity, e.g. IFoo`3
+                    // Avoids any ToFullString() trivia/whitespace issues with the generic suffix.
+                    typeName = $"{genericNameSyntax.Identifier.ValueText}`{genericArgumentCount}";
                 }
 
                 var fullTypeNames = namespaces.Select(ns => $"{ns}.{typeName}").Concat([typeName]);
@@ -512,7 +594,7 @@
 
                 if (factoryInterfaceTypeSymbol == null)
                 {
-                    throw new InvalidOperationException("Factory {0} type couldn't be resolved in {1}.".FormatWith(typeName, GetDeclarationFullName(concreteClassDeclarationSyntax)));
+                    throw new InvalidOperationException($"Factory {typeName} type couldn't be resolved in {GetDeclarationFullName(concreteClassDeclarationSyntax)}.");
                 }
 
                 if (factoryInterfaceTypeSymbol.IsUnboundGenericType)
@@ -522,7 +604,7 @@
             }
             else
             {
-                throw new InvalidOperationException("Factory type must be specified in {0} on {1}.".FormatWith(factoryAttribute.Name.ToFullString(), GetDeclarationFullName(concreteClassDeclarationSyntax)));
+                throw new InvalidOperationException($"Factory type must be specified in {factoryAttribute.Name.ToFullString()} on {GetDeclarationFullName(concreteClassDeclarationSyntax)}.");
             }
 
             var factoryClassGenericName = GetFactoryClassGenericName(concreteClassDeclarationSyntax, factoryInterfaceTypeSymbol);
@@ -532,7 +614,7 @@
 
             var folders = string.Join(@"\", typeDeclarationDocument.Folders);
             var safeFileName = GetSafeFileName(factoryClassGenericName);
-            var fileName = "{0}.Generated.cs".FormatWith(safeFileName);
+            var fileName = $"{safeFileName}.Generated.cs";
             var generatedFilePath = Path.Combine(Path.GetDirectoryName(project.FilePath), folders, fileName);
             var relativeFilePath = Path.Combine(folders, typeDeclarationDocument.Name);
 
@@ -550,7 +632,7 @@
                 fileHashBuilder.AppendFormat("{0:X2}", b);
             }
 
-            var fileHash = fileHashBuilder.ToString();
+            var fileHash = fileHashBuilder.ToString() + "+" + this.templateHash;
             if (VerifyAndAddHash(fileHashesPerProject, fileHash, project, relativeFilePath) && File.Exists(generatedFilePath))
             {
                 return (generatedFilePath, false);
@@ -563,6 +645,64 @@
             this.RenderFactoryImplementation(generatedFilePath, concreteClassDeclarationSyntax, concreteClassTypeSymbol, factoryInterfaceTypeSymbol, GetSafeFileName(factoryClassGenericName), genericArgumentTypeSymbols, isSdkStyleProject);
 
             return (generatedFilePath, true);
+        }
+
+        private static string[] SplitTopLevelGenericArguments(string content)
+        {
+            var args = new List<string>();
+            var depth = 0;
+            var start = 0;
+            for (var i = 0; i < content.Length; i++)
+            {
+                var c = content[i];
+                if (c == '<') depth++;
+                else if (c == '>') depth--;
+                else if (c == ',' && depth == 0)
+                {
+                    args.Add(content.Substring(start, i - start).Trim());
+                    start = i + 1;
+                }
+            }
+
+            if (start < content.Length)
+                args.Add(content.Substring(start).Trim());
+
+            return args.ToArray();
+        }
+
+        private static INamedTypeSymbol ResolveTypeByName(string typeName, IEnumerable<string> namespaces, Compilation compilation)
+        {
+            typeName = typeName.Trim();
+            var namespacesArray = namespaces as string[] ?? namespaces.ToArray();
+
+            if (typeName.Contains("<"))
+            {
+                // Nested generic, e.g. EcuGroupFunctionStep<MaintenanceModeCrsStep>
+                var openBracketIdx = typeName.IndexOf('<');
+                var outerName = typeName.Substring(0, openBracketIdx);
+                var innerContent = typeName.Substring(openBracketIdx + 1, typeName.Length - openBracketIdx - 2);
+                var innerArgNames = SplitTopLevelGenericArguments(innerContent);
+
+                var resolvedInnerArgs = innerArgNames
+                    .Select(arg => ResolveTypeByName(arg, namespacesArray, compilation))
+                    .ToArray();
+
+                if (resolvedInnerArgs.Any(a => a == null))
+                    return null;
+
+                var openGenericMetadataName = $"{outerName}`{innerArgNames.Length}";
+                var openGeneric = namespacesArray
+                                      .Select(ns => compilation.GetTypeByMetadataName($"{ns}.{openGenericMetadataName}"))
+                                      .FirstOrDefault(t => t != null)
+                                  ?? compilation.GetTypeByMetadataName(openGenericMetadataName);
+
+                return openGeneric?.Construct(resolvedInnerArgs);
+            }
+
+            return namespacesArray
+                       .Select(ns => compilation.GetTypeByMetadataName($"{ns}.{typeName}"))
+                       .FirstOrDefault(t => t != null)
+                   ?? compilation.GetTypeByMetadataName(typeName);
         }
 
         private void RemoveObsoleteFactoriesFromSolution(string[] obsoleteFactoryFilePaths,
@@ -627,6 +767,17 @@
             var fileName = Path.GetFileName(generatedFilePath);
             var factoryInterfaceName = factoryInterfaceTypeSymbol.Name;
 
+            // When concrete type arguments are provided (e.g. typeof(IFoo<ConcreteA, ConcreteB>)),
+            // construct the closed generic interface so that all method return types and parameter
+            // types already carry the concrete types. This ensures the generated method signatures
+            // use the real types rather than the open type-parameter names.
+            // For non-generic factories and open-generic-forwarding factories (typeof(IFoo<,,>)),
+            // the symbol is used as-is — the factory class itself stays generic.
+            var closedFactoryInterfaceTypeSymbol = genericArgumentTypeSymbols.Length > 0
+                                                   && genericArgumentTypeSymbols.Length == factoryInterfaceTypeSymbol.TypeParameters.Length
+                                                       ? factoryInterfaceTypeSymbol.Construct(genericArgumentTypeSymbols)
+                                                       : factoryInterfaceTypeSymbol;
+
             var (project, typeDeclarationDocument) = this.solution.Projects.Select(proj => (proj, doc: proj.GetDocument(concreteClassDeclarationSyntax.SyntaxTree))).First(t => t.doc != null);
             var factoryGeneratorEngine = new FactoryGeneratorEngine(project, this.templatePath);
 
@@ -634,12 +785,63 @@
             var outerUsingDeclarations = FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<CompilationUnitSyntax>().Usings, usingsToFilterOut);
             var innerUsingDeclarations = FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<BaseNamespaceDeclarationSyntax>().Usings, usingsToFilterOut);
 
-            var factoryInterfaceMethods = GetSuitableFactoryInterfaceMethods(concreteClassTypeSymbol, factoryInterfaceTypeSymbol, genericArgumentTypeSymbols);
+            // Also pull in usings from the factory interface's source file — it may reference
+            // types (e.g. parameter types in Create()) whose namespaces are not imported by the
+            // concrete class's file. Collect both file-level and namespace-level usings.
+            var interfaceUsings = factoryInterfaceTypeSymbol.DeclaringSyntaxReferences
+                .Select(r => r.GetSyntax())
+                .Where(n => n != null)
+                .SelectMany(n =>
+                {
+                    var compilationUsings = n.FirstAncestorOrSelf<CompilationUnitSyntax>()?.Usings ?? default;
+                    var namespaceUsings = n.FirstAncestorOrSelf<BaseNamespaceDeclarationSyntax>()?.Usings ?? default;
+                    return compilationUsings.Concat(namespaceUsings);
+                })
+                .Where(u => u.Alias == null)
+                .ToArray();
+
+            // Collect all namespaces visible in the generated file so we can shorten FQNs.
+            var @namespace = GetDeclarationNamespaceFullName(concreteClassDeclarationSyntax);
+            var knownNamespaces = outerUsingDeclarations
+                .Concat(innerUsingDeclarations)
+                .Concat(interfaceUsings)
+                .Where(u => u.Alias == null)
+                .Select(u => u.Name.ToString())
+                .Append(@namespace)
+                .Append(concreteClassTypeSymbol.ContainingNamespace.ToString())
+                .Distinct()
+                .ToList();
+
+            // Merge interface usings into innerUsingDeclarations, skipping any already present
+            // or belonging to the generated file's own namespace.
+            var existingUsingNames = new HashSet<string>(
+                outerUsingDeclarations.Concat(innerUsingDeclarations)
+                    .Where(u => u.Alias == null)
+                    .Select(u => u.Name.ToString()));
+            existingUsingNames.Add(@namespace);
+            existingUsingNames.UnionWith(usingsToFilterOut);
+
+            // Take the leading trivia (indentation) from an existing inner using so the
+            // appended directives match the file's indentation style exactly.
+            var innerUsingLeadingTrivia = innerUsingDeclarations.Count > 0
+                ? innerUsingDeclarations[0].GetLeadingTrivia()
+                : SyntaxFactory.TriviaList(SyntaxFactory.Whitespace("    "));
+
+            foreach (var u in interfaceUsings)
+            {
+                var name = u.Name.ToString();
+                if (existingUsingNames.Add(name))
+                    innerUsingDeclarations = innerUsingDeclarations.Add(
+                        u.WithLeadingTrivia(innerUsingLeadingTrivia)
+                         .WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed));
+            }
+
+            var factoryInterfaceMethods = GetSuitableFactoryInterfaceMethods(concreteClassTypeSymbol, closedFactoryInterfaceTypeSymbol, genericArgumentTypeSymbols);
 
             var allContractMethodParameters = factoryInterfaceMethods.SelectMany(contractTypeMethod => contractTypeMethod.symbol.Parameters).ToArray();
             if (!factoryInterfaceMethods.Any())
             {
-                throw new InvalidOperationException("The interface {0} has no suitable method returning any interface implemented by {1}. Please check if their is any.".FormatWith(factoryInterfaceTypeSymbol, concreteClassTypeSymbol));
+                throw new InvalidOperationException($"The interface {closedFactoryInterfaceTypeSymbol} has no suitable method returning any interface implemented by {concreteClassTypeSymbol}. Please check if their is any.");
             }
 
             var allConstructorParameters = factoryInterfaceMethods.Select(factoryMethod => SelectConstructorFromFactoryMethod(factoryMethod.symbol, concreteClassTypeSymbol))
@@ -654,8 +856,6 @@
 #pragma warning restore RS1024 // Symbols should be compared for equality
 
             var concreteClassName = GetXmlDocSafeTypeName(concreteClassTypeSymbol.ToString());
-            var @namespace = GetDeclarationNamespaceFullName(concreteClassDeclarationSyntax);
-
             var generateCodeArguments = new[] { new Value("\"DeveloperInTheFlow.FactoryGenerator\"", false), new Value($"\"{this.version}\"", true) };
 
             // Class attributes
@@ -683,8 +883,9 @@
                                                                     Attribute.Create("global::System.Diagnostics.DebuggerNonUserCodeAttribute")
                                                                 ]).ToArray();
 
-            // Generic types of the factory
-            var classGenericTypes = this.genericTypeBuilderService.Build(factoryInterfaceTypeSymbol.TypeParameters, genericArgumentTypeSymbols);
+            // Generic types of the factory — merge concrete class constraints by position for open-generic forwarding.
+            // Materialize to array so both GenericTypes and GenericTypeConstraints can iterate it independently.
+            var classGenericTypes = this.genericTypeBuilderService.Build(factoryInterfaceTypeSymbol.TypeParameters, genericArgumentTypeSymbols, concreteClassTypeSymbol.TypeParameters).ToArray();
 
             // Constructor of the factory
             var constructor = this.constructorBuilderService.Build(concreteClassDeclarationSyntax, injectedParameters);
@@ -693,18 +894,10 @@
             var fields = this.fieldsBuilderService.Build(injectedParameters).ToArray();
 
             // Methods of the factory
-            var methods = this.methodsBuilderService.Build(concreteClassTypeSymbol, fields, injectedParameters, factoryInterfaceMethods, factoryInterfaceName);
+            var methods = this.methodsBuilderService.Build(concreteClassTypeSymbol, fields, injectedParameters, factoryInterfaceMethods, factoryInterfaceName, factoryInterfaceTypeSymbol, knownNamespaces);
 
-            // Interface of the factory
-            var inherit = factoryInterfaceTypeSymbol.ToString();
-
-            for (var i = 0; i < genericArgumentTypeSymbols.Length; i++)
-            {
-                if (genericArgumentTypeSymbols[i] != null)
-                {
-                    inherit = inherit.Replace(factoryInterfaceTypeSymbol.TypeArguments[i].Name, genericArgumentTypeSymbols[i].ToString());
-                }
-            }
+            // Interface of the factory — use the closed symbol so it already has concrete type arguments
+            var inherit = ShortenTypeName(closedFactoryInterfaceTypeSymbol.ToString(), knownNamespaces);
 
             // The factory
             var factoryClass = new Class(classAttributes, concreteClassName, constructor, methods, fields, classGenericTypes, inherit, factoryName);
