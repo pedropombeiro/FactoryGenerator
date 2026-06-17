@@ -66,7 +66,7 @@
 
         private string ResolveTemplatePath(string factoryFor)
         {
-            var customTemplatePath = string.Format(@"{0}\{1}.render", Path.GetDirectoryName(this.templatePath), factoryFor);
+            var customTemplatePath = $@"{Path.GetDirectoryName(this.templatePath)}\{factoryFor}.render";
             if (File.Exists(customTemplatePath))
             {
                 return customTemplatePath;

@@ -227,6 +227,44 @@
         }
 
         /// <summary>
+        ///     Recursively collects all distinct containing namespaces from a set of type symbols,
+        ///     including generic type arguments. Used to ensure every referenced namespace has a
+        ///     corresponding using directive in the generated file.
+        /// </summary>
+        private static IEnumerable<INamespaceSymbol> CollectNamespacesFromTypes(IEnumerable<ITypeSymbol> types)
+        {
+            var visited = new HashSet<string>();
+            var queue = new Queue<ITypeSymbol>(types);
+            while (queue.Count > 0)
+            {
+                var type = queue.Dequeue();
+                if (type == null) continue;
+
+                // Unwrap arrays
+                if (type is IArrayTypeSymbol arrayType)
+                {
+                    queue.Enqueue(arrayType.ElementType);
+                    continue;
+                }
+
+                var ns = type.ContainingNamespace;
+                if (ns != null && !ns.IsGlobalNamespace)
+                {
+                    var nsName = ns.ToString();
+                    if (visited.Add(nsName))
+                        yield return ns;
+                }
+
+                // Recurse into generic type arguments
+                if (type is INamedTypeSymbol named)
+                {
+                    foreach (var arg in named.TypeArguments)
+                        queue.Enqueue(arg);
+                }
+            }
+        }
+
+        /// <summary>
         ///     Strips namespace prefixes from a fully-qualified type name (including inside generic
         ///     angle brackets) when that namespace appears in <paramref name="knownNamespaces"/>,
         ///     producing the shortest name that is unambiguous given the file's using directives.
@@ -240,8 +278,26 @@
             var ltIdx = typeName.IndexOf('<');
             if (ltIdx >= 0)
             {
+                // Find the matching '>' by tracking nesting depth. This correctly handles
+                // types with a suffix after the closing '>', e.g. 'Option<T>[]' (array of generic).
+                var scanDepth = 0;
+                var gtIdx = -1;
+                for (var i = ltIdx; i < typeName.Length; i++)
+                {
+                    if (typeName[i] == '<') scanDepth++;
+                    else if (typeName[i] == '>')
+                    {
+                        scanDepth--;
+                        if (scanDepth == 0) { gtIdx = i; break; }
+                    }
+                }
+
+                if (gtIdx < 0)
+                    return typeName; // malformed — return as-is
+
                 var outerPart = typeName.Substring(0, ltIdx);
-                var innerContent = typeName.Substring(ltIdx + 1, typeName.Length - ltIdx - 2);
+                var innerContent = typeName.Substring(ltIdx + 1, gtIdx - ltIdx - 1);
+                var suffix = typeName.Substring(gtIdx + 1); // e.g. "[]" for array types
                 var shortenedOuter = ShortenTypeName(outerPart, knownNamespaces);
                 // Split inner args at top-level commas only
                 var args = new List<string>();
@@ -259,7 +315,7 @@
                     }
                 }
                 args.Add(ShortenTypeName(innerContent.Substring(start).Trim(), knownNamespaces));
-                return $"{shortenedOuter}<{string.Join(", ", args)}>";
+                return $"{shortenedOuter}<{string.Join(", ", args)}>{suffix}";
             }
 
             // No generics — strip the longest matching namespace prefix
@@ -275,6 +331,22 @@
                         best = candidate;
                 }
             }
+
+            // DEBUG: Log when we fail to shorten a type that looks like it should be shortened
+            if (typeName.Contains("IEcuGroupUreaTestingFunctionRoutineControlFeatureService"))
+            {
+                System.Diagnostics.Debug.WriteLine($"FAILED TO SHORTEN: '{typeName}'");
+                System.Diagnostics.Debug.WriteLine($"Looking for prefixes in {knownNamespaces?.Count ?? 0} namespaces");
+                if (knownNamespaces != null)
+                {
+                    foreach (var ns in knownNamespaces.Where(n => n.Contains("ScrFunctions") || n.Contains("Lidec2") || n.Contains("Edc17")))
+                    {
+                        System.Diagnostics.Debug.WriteLine($"  Checking: '{ns}.'  StartsWith={typeName.StartsWith(ns + ".")}");
+                        
+                    }
+                }
+            }
+
             return best;
         }
 
@@ -782,12 +854,41 @@
             var factoryGeneratorEngine = new FactoryGeneratorEngine(project, this.templatePath);
 
             var usingsToFilterOut = new[] { concreteClassTypeSymbol.ContainingNamespace.ToString() };
+
+            // Collect extern alias directives from both the concrete class and the factory interface.
+            // Externs can appear at file scope (CompilationUnitSyntax.Externs) or inside namespace
+            // blocks (BaseNamespaceDeclarationSyntax.Externs). Collect from both locations.
+            var concreteCompilation = concreteClassDeclarationSyntax.FirstAncestorOrSelf<CompilationUnitSyntax>();
+            var concreteNamespace = concreteClassDeclarationSyntax.FirstAncestorOrSelf<BaseNamespaceDeclarationSyntax>();
+            var concreteExterns = (concreteCompilation?.Externs ?? default)
+                .Concat(concreteNamespace?.Externs ?? default);
+
+            var interfaceExterns = factoryInterfaceTypeSymbol.DeclaringSyntaxReferences
+                .SelectMany(r =>
+                {
+                    var syntax = r.GetSyntax();
+                    var fileExterns = syntax.FirstAncestorOrSelf<CompilationUnitSyntax>()?.Externs ?? default;
+                    var nsExterns = syntax.FirstAncestorOrSelf<BaseNamespaceDeclarationSyntax>()?.Externs ?? default;
+                    return fileExterns.Concat(nsExterns);
+                });
+
+            var allExterns = concreteExterns.Concat(interfaceExterns)
+                .GroupBy(e => e.Identifier.Text)
+                .Select(g => g.First())
+                .ToArray();
+
             var outerUsingDeclarations = FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<CompilationUnitSyntax>().Usings, usingsToFilterOut);
             var innerUsingDeclarations = FilterOutUsings(concreteClassDeclarationSyntax.FirstAncestorOrSelf<BaseNamespaceDeclarationSyntax>().Usings, usingsToFilterOut);
 
+            // Collect all usings from the concrete class (including alias-qualified ones from the class itself)
+            var concreteUsingsAll = (concreteCompilation?.Usings ?? default)
+                .Concat(concreteNamespace?.Usings ?? default)
+                .ToArray();
+
             // Also pull in usings from the factory interface's source file — it may reference
             // types (e.g. parameter types in Create()) whose namespaces are not imported by the
-            // concrete class's file. Collect both file-level and namespace-level usings.
+            // concrete class's file. Collect both file-level and namespace-level usings, including
+            // alias-qualified usings (e.g. ExternAlias::Namespace) which reference extern aliases.
             var interfaceUsings = factoryInterfaceTypeSymbol.DeclaringSyntaxReferences
                 .Select(r => r.GetSyntax())
                 .Where(n => n != null)
@@ -797,29 +898,55 @@
                     var namespaceUsings = n.FirstAncestorOrSelf<BaseNamespaceDeclarationSyntax>()?.Usings ?? default;
                     return compilationUsings.Concat(namespaceUsings);
                 })
-                .Where(u => u.Alias == null)
                 .ToArray();
 
+            // Combine usings from both sources
+            var allUsings = concreteUsingsAll.Concat(interfaceUsings).ToArray();
+
+            // For alias-qualified usings (e.g. ExternAlias::Namespace.Type), extract the
+            // unqualified namespace names. The Name property for an alias-qualified using
+            // is an AliasQualifiedNameSyntax, so we need to extract the right side (after ::).
+            var aliasQualifiedNamespaces = allUsings
+                .Where(u => u.Alias != null)
+                .Select(u =>
+                {
+                    // For "using Alias::Namespace;", u.Name might be an AliasQualifiedNameSyntax
+                    // where ToString() includes "Alias::Namespace". We want just "Namespace".
+                    var name = u.Name;
+                    if (name is Microsoft.CodeAnalysis.CSharp.Syntax.AliasQualifiedNameSyntax aliasQual)
+                    {
+                        // Extract just the right side (after ::)
+                        name = aliasQual.Name;
+                    }
+                    var nameText = name.ToString().Trim();
+                    Logger.DebugFormat("Alias-qualified using: Alias={0}, Extracted namespace={1}", u.Alias.Name.Identifier.Text, nameText);
+                    return nameText;
+                })
+                .Where(ns => !string.IsNullOrWhiteSpace(ns))
+                .ToList();
+
             // Collect all namespaces visible in the generated file so we can shorten FQNs.
+            // Include both unaliased usings AND alias-qualified usings, because once a using
+            // directive (even alias-qualified) brings a namespace into scope, types from that
+            // namespace can be referenced without the full prefix.
             var @namespace = GetDeclarationNamespaceFullName(concreteClassDeclarationSyntax);
-            var knownNamespaces = outerUsingDeclarations
-                .Concat(innerUsingDeclarations)
-                .Concat(interfaceUsings)
+            var knownNamespaces = allUsings
                 .Where(u => u.Alias == null)
                 .Select(u => u.Name.ToString())
+                .Concat(aliasQualifiedNamespaces)  // Also include alias-qualified namespaces
                 .Append(@namespace)
                 .Append(concreteClassTypeSymbol.ContainingNamespace.ToString())
                 .Distinct()
                 .ToList();
 
             // Merge interface usings into innerUsingDeclarations, skipping any already present
-            // or belonging to the generated file's own namespace.
-            var existingUsingNames = new HashSet<string>(
+            // or belonging to the generated file's own namespace. Track both simple names for
+            // unaliased usings and full text for alias-qualified usings to avoid duplicates.
+            var existingUsingSignatures = new HashSet<string>(
                 outerUsingDeclarations.Concat(innerUsingDeclarations)
-                    .Where(u => u.Alias == null)
-                    .Select(u => u.Name.ToString()));
-            existingUsingNames.Add(@namespace);
-            existingUsingNames.UnionWith(usingsToFilterOut);
+                    .Select(u => u.ToFullString().Trim()));
+            existingUsingSignatures.Add(@namespace);
+            existingUsingSignatures.UnionWith(usingsToFilterOut);
 
             // Take the leading trivia (indentation) from an existing inner using so the
             // appended directives match the file's indentation style exactly.
@@ -827,10 +954,10 @@
                 ? innerUsingDeclarations[0].GetLeadingTrivia()
                 : SyntaxFactory.TriviaList(SyntaxFactory.Whitespace("    "));
 
-            foreach (var u in interfaceUsings)
+            foreach (var u in allUsings)
             {
-                var name = u.Name.ToString();
-                if (existingUsingNames.Add(name))
+                var signature = u.ToFullString().Trim();
+                if (existingUsingSignatures.Add(signature))
                     innerUsingDeclarations = innerUsingDeclarations.Add(
                         u.WithLeadingTrivia(innerUsingLeadingTrivia)
                          .WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed));
@@ -842,6 +969,47 @@
             if (!factoryInterfaceMethods.Any())
             {
                 throw new InvalidOperationException($"The interface {closedFactoryInterfaceTypeSymbol} has no suitable method returning any interface implemented by {concreteClassTypeSymbol}. Please check if their is any.");
+            }
+
+            // Ensure every namespace referenced by factory method parameter types and return types
+            // has a corresponding using directive. This catches implicit namespaces (e.g. 'System'
+            // for IObservable<T>) that are never explicitly imported in the source files.
+            // Collect all missing namespaces first, sort them (System.* first, then alphabetically),
+            // then insert them at the correct position in the using list.
+            // Skip namespaces already covered by alias-qualified usings to avoid duplicates.
+            var allFactoryTypes = factoryInterfaceMethods
+                .SelectMany(m => m.symbol.Parameters.Select(p => p.Type).Append(m.returnType));
+            // Track namespace strings (not full using signatures) to detect missing namespaces
+            var existingNamespaceNames = new HashSet<string>(knownNamespaces);
+            existingNamespaceNames.UnionWith(aliasQualifiedNamespaces); // Prevent duplicate plain usings for alias-qualified namespaces
+            var missingNamespaces = CollectNamespacesFromTypes(allFactoryTypes)
+                .Select(ns => ns.ToString())
+                .Where(nsName => !string.IsNullOrEmpty(nsName) && existingNamespaceNames.Add(nsName))
+                .OrderBy(nsName => nsName.StartsWith("System", StringComparison.Ordinal) ? 0 : 1)
+                .ThenBy(nsName => nsName, StringComparer.Ordinal)
+                .ToList();
+
+            foreach (var nsName in missingNamespaces)
+            {
+                knownNamespaces.Add(nsName);
+                // " " prefix on the name gives the required space between 'using' keyword and name.
+                var newUsing = SyntaxFactory.UsingDirective(SyntaxFactory.ParseName(" " + nsName))
+                    .WithLeadingTrivia(innerUsingLeadingTrivia)
+                    .WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
+
+                // Insert System.* usings before the first non-System using; append others at end.
+                if (nsName.StartsWith("System", StringComparison.Ordinal))
+                {
+                    var insertIdx = innerUsingDeclarations
+                        .Select((u, i) => (u, i))
+                        .FirstOrDefault(t => !t.u.Name.ToString().TrimStart().StartsWith("System", StringComparison.Ordinal))
+                        .i;
+                    innerUsingDeclarations = innerUsingDeclarations.Insert(insertIdx, newUsing);
+                }
+                else
+                {
+                    innerUsingDeclarations = innerUsingDeclarations.Add(newUsing);
+                }
             }
 
             var allConstructorParameters = factoryInterfaceMethods.Select(factoryMethod => SelectConstructorFromFactoryMethod(factoryMethod.symbol, concreteClassTypeSymbol))
@@ -888,29 +1056,35 @@
             var classGenericTypes = this.genericTypeBuilderService.Build(factoryInterfaceTypeSymbol.TypeParameters, genericArgumentTypeSymbols, concreteClassTypeSymbol.TypeParameters).ToArray();
 
             // Constructor of the factory
-            var constructor = this.constructorBuilderService.Build(concreteClassDeclarationSyntax, injectedParameters);
+            var constructor = this.constructorBuilderService.Build(concreteClassDeclarationSyntax, injectedParameters, knownNamespaces);
 
             // Fields of the factory
-            var fields = this.fieldsBuilderService.Build(injectedParameters).ToArray();
+            var fields = this.fieldsBuilderService.Build(injectedParameters, knownNamespaces).ToArray();
 
             // Methods of the factory
             var methods = this.methodsBuilderService.Build(concreteClassTypeSymbol, fields, injectedParameters, factoryInterfaceMethods, factoryInterfaceName, factoryInterfaceTypeSymbol, knownNamespaces);
 
             // Interface of the factory — use the closed symbol so it already has concrete type arguments
-            var inherit = ShortenTypeName(closedFactoryInterfaceTypeSymbol.ToString(), knownNamespaces);
+            var inheritFqn = closedFactoryInterfaceTypeSymbol.ToString();
+            var inherit = ShortenTypeName(inheritFqn, knownNamespaces);
 
             // The factory
             var factoryClass = new Class(classAttributes, concreteClassName, constructor, methods, fields, classGenericTypes, inherit, factoryName);
 
             // The file containing the factory
+            // Place extern aliases inside the namespace (before inner usings) to match C# convention
+            // where externs from interface namespace blocks are preserved
+            var innerContent = allExterns.Any()
+                ? string.Concat(allExterns.Select(e => "    " + e.ToFullString())) + "\r\n" + innerUsingDeclarations.ToFullString()
+                : innerUsingDeclarations.ToFullString();
             var factoryFile = FactoryFile.Create(
                                                  @namespace,
                                                  factoryClass,
-                                                 innerUsingDeclarations.ToFullString(),
+                                                 innerContent,
                                                  outerUsingDeclarations.ToFullString());
 
             object model = factoryFile;
-            var transformationScript = $@"{Path.GetDirectoryName(this.templatePath)}\{factoryFile.FactoryFor}.tcs";
+            var transformationScript = $@"{Path.GetDirectoryName(this.templatePath)}\{inheritFqn}.tcs";
 
             // Execute the script associated to the template in order to adapt the model for the template whether it exists.
             if (File.Exists(transformationScript))
@@ -931,7 +1105,7 @@
             }
 
             // The result of the generator
-            var factoryResult = factoryGeneratorEngine.Generate(model, factoryFile.FactoryFor);
+            var factoryResult = factoryGeneratorEngine.Generate(model, inheritFqn);
 
             if (!isSdkStyleProject)
             {
