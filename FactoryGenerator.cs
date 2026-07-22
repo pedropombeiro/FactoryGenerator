@@ -69,6 +69,8 @@
 
         private readonly Workspace workspace;
 
+        private readonly string solutionDirectory;
+
         private Solution solution;
 
         #endregion
@@ -85,6 +87,8 @@
         {
             this.workspace = workspace;
             this.solution = solution;
+            // Normalize solution directory once to ensure consistent path handling across all operations
+            this.solutionDirectory = Path.GetFullPath(Path.GetDirectoryName(solution.FilePath));
 
             var importList = attributeImportList as string[] ?? attributeImportList.ToArray();
             this.attributeImportList = importList;
@@ -119,12 +123,18 @@
             var projectCount = this.solution.Projects.Count();
             var existingFactoriesTasksList = new List<Task<ICollection<string>>>(projectCount);
             var generatedFactoriesTasksList = new List<Task<ICollection<string>>>(projectCount);
-            var hashesFile = Path.Combine(Path.GetDirectoryName(this.solution.FilePath), "generatedFactoryHashes.json");
+            var hashesFile = Path.Combine(this.solutionDirectory, "generatedFactoryHashes.json");
 
-            Dictionary<string, Dictionary<string, string>> fileHashesPerProject = new Dictionary<string, Dictionary<string, string>>();
+            // Use case-insensitive comparers to handle path casing variations between runs
+            Dictionary<string, Dictionary<string, string>> fileHashesPerProject = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
             if (File.Exists(hashesFile) && !this.forceGeneration)
             {
-                fileHashesPerProject = JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, string>>>(File.ReadAllText(hashesFile));
+                var loadedHashes = JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, string>>>(File.ReadAllText(hashesFile));
+                // Rebuild with case-insensitive comparers at both levels
+                foreach (var kvp in loadedHashes)
+                {
+                    fileHashesPerProject[kvp.Key] = new Dictionary<string, string>(kvp.Value, StringComparer.OrdinalIgnoreCase);
+                }
             }
 
             Dictionary<string, bool> isSdkStyleProjectDict = new Dictionary<string, bool>();
@@ -527,12 +537,26 @@
         private static bool VerifyAndAddHash(Dictionary<string, Dictionary<string, string>> fileHashesPerProject,
                                              string fileHash,
                                              Project project,
-                                             string relativeFilePath)
+                                             string relativeFilePath,
+                                             string solutionDirectory)
         {
-            var identifier = project.FilePath.Replace(Path.GetDirectoryName(project.Solution.FilePath), string.Empty).TrimStart('\\');
+            // Normalize paths to ensure consistent identifiers regardless of how the solution path is passed
+            var projectPath = Path.GetFullPath(project.FilePath);
+            
+            // Ensure solution directory ends with directory separator for consistent replacement
+            var solutionDir = solutionDirectory;
+            if (!solutionDir.EndsWith(Path.DirectorySeparatorChar.ToString()))
+            {
+                solutionDir += Path.DirectorySeparatorChar;
+            }
+            
+            var identifier = projectPath.StartsWith(solutionDir, StringComparison.OrdinalIgnoreCase)
+                ? projectPath.Substring(solutionDir.Length)
+                : projectPath;
+            
             if (!fileHashesPerProject.ContainsKey(identifier))
             {
-                fileHashesPerProject.Add(identifier, new Dictionary<string, string>());
+                fileHashesPerProject.Add(identifier, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
             }
 
             if (fileHashesPerProject[identifier].ContainsKey(relativeFilePath))
@@ -705,7 +729,7 @@
             }
 
             var fileHash = fileHashBuilder.ToString() + "+" + this.templateHash;
-            if (VerifyAndAddHash(fileHashesPerProject, fileHash, project, relativeFilePath) && File.Exists(generatedFilePath))
+            if (VerifyAndAddHash(fileHashesPerProject, fileHash, project, relativeFilePath, this.solutionDirectory) && File.Exists(generatedFilePath))
             {
                 return (generatedFilePath, false);
             }
@@ -809,7 +833,7 @@
         {
             foreach (var projectPath in fileHashesPerProject.Keys.ToArray())
             {
-                var project = this.solution.Projects.FirstOrDefault(p => p.FilePath.Equals(Path.Combine(Path.GetDirectoryName(this.solution.FilePath), projectPath)));
+                var project = this.solution.Projects.FirstOrDefault(p => Path.GetFullPath(p.FilePath).Equals(Path.GetFullPath(Path.Combine(this.solutionDirectory, projectPath)), StringComparison.OrdinalIgnoreCase));
 
                 if (project == null)
                 {
