@@ -63,6 +63,8 @@
 
         private readonly string templatePath;
 
+        private readonly string templateDirectory;
+
         private readonly string templateHash;
 
         private readonly string version = FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).ProductVersion;
@@ -92,12 +94,25 @@
 
             var importList = attributeImportList as string[] ?? attributeImportList.ToArray();
             this.attributeImportList = importList;
-            this.templatePath = templatePath;
+            
+            // Normalize template path: if relative, resolve against executable directory to ensure
+            // consistent hash regardless of current working directory
+            if (!Path.IsPathRooted(templatePath))
+            {
+                var exeDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                this.templatePath = Path.GetFullPath(Path.Combine(exeDirectory, templatePath));
+            }
+            else
+            {
+                this.templatePath = Path.GetFullPath(templatePath);
+            }
+            
+            this.templateDirectory = Path.GetDirectoryName(this.templatePath);
             this.forceGeneration = forceGeneration;
 
             using (var sha1 = new SHA1Managed())
             {
-                var templateBytes = File.ReadAllBytes(templatePath);
+                var templateBytes = File.ReadAllBytes(this.templatePath);
                 var hashBytes = sha1.ComputeHash(templateBytes);
                 this.templateHash = BitConverter.ToString(hashBytes).Replace("-", string.Empty);
             }
@@ -561,11 +576,35 @@
 
             if (fileHashesPerProject[identifier].ContainsKey(relativeFilePath))
             {
-                if (fileHashesPerProject[identifier][relativeFilePath] == fileHash)
+                var storedHash = fileHashesPerProject[identifier][relativeFilePath];
+                
+                // Exact match - no regeneration needed
+                if (storedHash == fileHash)
                 {
                     return true;
                 }
+                
+                // Smart hash comparison: hash format is "source_hash+template_hash"
+                // If only the template hash changed (e.g., due to version upgrade),
+                // update the stored hash without regenerating
+                var storedParts = storedHash.Split('+');
+                var newParts = fileHash.Split('+');
+                
+                if (storedParts.Length == 2 && newParts.Length == 2)
+                {
+                    // Compare source file hash part only
+                    if (storedParts[0] == newParts[0])
+                    {
+                        // Source file hasn't changed, only template hash differs
+                        // Update to new hash format without regenerating
+                        Logger.DebugFormat("Source unchanged for {0}, updating template hash from {1} to {2}", 
+                            relativeFilePath, storedParts[1].Substring(0, 8), newParts[1].Substring(0, 8));
+                        fileHashesPerProject[identifier][relativeFilePath] = fileHash;
+                        return true; // Skip regeneration
+                    }
+                }
 
+                // Source or template content actually changed - needs regeneration
                 fileHashesPerProject[identifier][relativeFilePath] = fileHash;
             }
             else
@@ -574,6 +613,32 @@
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Resolves which template will be used for a given factory interface and computes its hash.
+        /// Mimics the logic in FactoryGeneratorEngine.ResolveTemplatePath to find custom templates.
+        /// </summary>
+        private string GetTemplateHashForFactory(INamedTypeSymbol factoryInterfaceTypeSymbol)
+        {
+            // Build the fully qualified name without generic type parameters for template file lookup
+            // Template files are named like: Liebherr.Lioba.Contracts.Services.IFeatureServiceFactory.render
+            // NOT: IFeatureServiceFactory<T>.render (no angle brackets)
+            var containingNamespace = factoryInterfaceTypeSymbol.ContainingNamespace?.ToString();
+            var typeName = factoryInterfaceTypeSymbol.Name; // Simple name without generic parameters
+            var templateName = string.IsNullOrEmpty(containingNamespace) 
+                ? typeName 
+                : $"{containingNamespace}.{typeName}";
+            
+            var customTemplatePath = Path.Combine(this.templateDirectory, $"{templateName}.render");
+            var actualTemplatePath = File.Exists(customTemplatePath) ? customTemplatePath : this.templatePath;
+            
+            using (var sha1 = new SHA1Managed())
+            {
+                var templateBytes = File.ReadAllBytes(actualTemplatePath);
+                var hashBytes = sha1.ComputeHash(templateBytes);
+                return BitConverter.ToString(hashBytes).Replace("-", string.Empty);
+            }
         }
 
         private async Task<ICollection<string>> GenerateFactoriesInProjectAsync(Compilation compilation,
@@ -625,9 +690,12 @@
                                                         Dictionary<string, Dictionary<string, string>> fileHashesPerProject,
                                                         Project project)
         {
+            INamedTypeSymbol factoryInterfaceTypeSymbol = null;
+            string generatedFilePath = null;
+            
+            try
+            {
             var factoryAttribute = GetFactoryAttributeFromClassDeclaration(concreteClassDeclarationSyntax);
-
-            INamedTypeSymbol factoryInterfaceTypeSymbol;
 
             var genericArgumentTypeSymbols = Array.Empty<INamedTypeSymbol>();
 
@@ -669,13 +737,40 @@
                     if (!isUnboundForwarded)
                     {
                         var genericArgumentNames = typeArgList.Select(a => a.ToFullString().Trim()).ToArray();
+                        
+                        Logger.DebugFormat("Resolving {0} generic arguments for {1}:", genericArgumentNames.Length, typeName);
+                        for (int i = 0; i < genericArgumentNames.Length; i++)
+                        {
+                            Logger.DebugFormat("  Arg {0}: '{1}'", i, genericArgumentNames[i]);
+                        }
+                        
                         genericArgumentTypeSymbols = genericArgumentNames
-                                                     .Select(arg => ResolveTypeByName(arg, namespaces, compilation))
+                                                     .Select((arg, idx) => 
+                                                     {
+                                                         var resolved = ResolveTypeByName(arg, namespaces, compilation);
+                                                         if (resolved == null)
+                                                         {
+                                                             Logger.ErrorFormat("Failed to resolve argument {0}: '{1}'", idx, arg);
+                                                         }
+                                                         else
+                                                         {
+                                                             Logger.DebugFormat("Successfully resolved argument {0}: '{1}' -> {2}", idx, arg, resolved);
+                                                         }
+                                                         return resolved;
+                                                     })
                                                      .ToArray();
 
                         if (genericArgumentTypeSymbols.Any(s => s == null))
                         {
-                            throw new InvalidOperationException($"Not all generic types for {typeName} have been found");
+                            var failedTypes = genericArgumentNames
+                                .Where((name, idx) => genericArgumentTypeSymbols[idx] == null)
+                                .ToArray();
+                            
+                            Logger.ErrorFormat("Failed to resolve generic type arguments for {0}", typeName);
+                            Logger.ErrorFormat("  Available namespaces: {0}", string.Join(", ", namespaces));
+                            Logger.ErrorFormat("  Failed to resolve: {0}", string.Join(", ", failedTypes));
+                            
+                            throw new InvalidOperationException($"Not all generic types for {typeName} have been found. Failed to resolve: {string.Join(", ", failedTypes)}");
                         }
                     }
 
@@ -704,14 +799,21 @@
             }
 
             var factoryClassGenericName = GetFactoryClassGenericName(concreteClassDeclarationSyntax, factoryInterfaceTypeSymbol);
-            var factoryInterfaceFullName = factoryInterfaceTypeSymbol.ToString();
+            
+            // Compute the closed factory interface type symbol to match the logic in RenderFactoryImplementation
+            // This determines the actual template name that will be used (for custom per-interface templates)
+            var closedFactoryInterfaceTypeSymbol = genericArgumentTypeSymbols.Length > 0
+                                                   && genericArgumentTypeSymbols.Length == factoryInterfaceTypeSymbol.TypeParameters.Length
+                                                       ? factoryInterfaceTypeSymbol.Construct(genericArgumentTypeSymbols)
+                                                       : factoryInterfaceTypeSymbol;
+            var factoryInterfaceFullName = closedFactoryInterfaceTypeSymbol.ToString();
 
             var typeDeclarationDocument = project.GetDocument(concreteClassDeclarationSyntax.SyntaxTree);
 
             var folders = string.Join(@"\", typeDeclarationDocument.Folders);
             var safeFileName = GetSafeFileName(factoryClassGenericName);
             var fileName = $"{safeFileName}.Generated.cs";
-            var generatedFilePath = Path.Combine(Path.GetDirectoryName(project.FilePath), folders, fileName);
+            generatedFilePath = Path.Combine(Path.GetDirectoryName(project.FilePath), folders, fileName);
             var relativeFilePath = Path.Combine(folders, typeDeclarationDocument.Name);
 
             bool IsLinkedFile()
@@ -728,7 +830,10 @@
                 fileHashBuilder.AppendFormat("{0:X2}", b);
             }
 
-            var fileHash = fileHashBuilder.ToString() + "+" + this.templateHash;
+            // Determine which template will actually be used for this factory and compute its hash
+            // Pass the original interface symbol, not the closed one, to avoid angle brackets in paths
+            var actualTemplateHash = this.GetTemplateHashForFactory(factoryInterfaceTypeSymbol);
+            var fileHash = fileHashBuilder.ToString() + "+" + actualTemplateHash;
             if (VerifyAndAddHash(fileHashesPerProject, fileHash, project, relativeFilePath, this.solutionDirectory) && File.Exists(generatedFilePath))
             {
                 return (generatedFilePath, false);
@@ -741,6 +846,19 @@
             this.RenderFactoryImplementation(generatedFilePath, concreteClassDeclarationSyntax, concreteClassTypeSymbol, factoryInterfaceTypeSymbol, GetSafeFileName(factoryClassGenericName), genericArgumentTypeSymbols, isSdkStyleProject);
 
             return (generatedFilePath, true);
+            }
+            catch (ArgumentException ex) when (ex.Message.Contains("Illegal characters in path"))
+            {
+                Logger.ErrorFormat("===== ILLEGAL CHARACTERS IN PATH ERROR =====");
+                Logger.ErrorFormat("Concrete class: {0}", GetDeclarationFullName(concreteClassDeclarationSyntax));
+                Logger.ErrorFormat("Factory interface: {0}", factoryInterfaceTypeSymbol?.ToString() ?? "(null)");
+                Logger.ErrorFormat("  Namespace: {0}", factoryInterfaceTypeSymbol?.ContainingNamespace?.ToString() ?? "(null)");
+                Logger.ErrorFormat("  Type name: {0}", factoryInterfaceTypeSymbol?.Name ?? "(null)");
+                Logger.ErrorFormat("Template directory: {0}", this.templateDirectory);
+                Logger.ErrorFormat("Error details: {0}", ex.Message);
+                Logger.ErrorFormat("Stack trace: {0}", ex.StackTrace);
+                throw;
+            }
         }
 
         private static string[] SplitTopLevelGenericArguments(string content)
@@ -775,30 +893,81 @@
             {
                 // Nested generic, e.g. EcuGroupFunctionStep<MaintenanceModeCrsStep>
                 var openBracketIdx = typeName.IndexOf('<');
-                var outerName = typeName.Substring(0, openBracketIdx);
-                var innerContent = typeName.Substring(openBracketIdx + 1, typeName.Length - openBracketIdx - 2);
+                var outerName = typeName.Substring(0, openBracketIdx).Trim();
+                
+                // Find matching closing bracket by tracking depth
+                var depth = 0;
+                var closeBracketIdx = -1;
+                for (var i = openBracketIdx; i < typeName.Length; i++)
+                {
+                    if (typeName[i] == '<') depth++;
+                    else if (typeName[i] == '>')
+                    {
+                        depth--;
+                        if (depth == 0)
+                        {
+                            closeBracketIdx = i;
+                            break;
+                        }
+                    }
+                }
+                
+                if (closeBracketIdx == -1)
+                {
+                    Logger.ErrorFormat("Could not find closing bracket for type: {0}", typeName);
+                    return null;
+                }
+                
+                var innerContent = typeName.Substring(openBracketIdx + 1, closeBracketIdx - openBracketIdx - 1).Trim();
                 var innerArgNames = SplitTopLevelGenericArguments(innerContent);
+
+                Logger.DebugFormat("Resolving nested generic: '{0}' with inner args: [{1}]", outerName, string.Join(", ", innerArgNames));
 
                 var resolvedInnerArgs = innerArgNames
                     .Select(arg => ResolveTypeByName(arg, namespacesArray, compilation))
                     .ToArray();
 
                 if (resolvedInnerArgs.Any(a => a == null))
+                {
+                    var failedArgs = innerArgNames.Where((name, idx) => resolvedInnerArgs[idx] == null).ToArray();
+                    Logger.ErrorFormat("Failed to resolve inner generic arguments for '{0}': {1}", outerName, string.Join(", ", failedArgs));
                     return null;
+                }
 
                 var openGenericMetadataName = $"{outerName}`{innerArgNames.Length}";
+                Logger.DebugFormat("Looking for open generic: {0}", openGenericMetadataName);
+                
                 var openGeneric = namespacesArray
                                       .Select(ns => compilation.GetTypeByMetadataName($"{ns}.{openGenericMetadataName}"))
                                       .FirstOrDefault(t => t != null)
                                   ?? compilation.GetTypeByMetadataName(openGenericMetadataName);
 
-                return openGeneric?.Construct(resolvedInnerArgs);
+                if (openGeneric == null)
+                {
+                    Logger.ErrorFormat("Could not find open generic type: {0} in namespaces: {1}", openGenericMetadataName, string.Join(", ", namespacesArray));
+                    return null;
+                }
+
+                Logger.DebugFormat("Successfully resolved nested generic: {0}", openGeneric.Construct(resolvedInnerArgs).ToString());
+                return openGeneric.Construct(resolvedInnerArgs);
             }
 
-            return namespacesArray
+            Logger.DebugFormat("Resolving simple type: {0}", typeName);
+            var result = namespacesArray
                        .Select(ns => compilation.GetTypeByMetadataName($"{ns}.{typeName}"))
                        .FirstOrDefault(t => t != null)
                    ?? compilation.GetTypeByMetadataName(typeName);
+            
+            if (result == null)
+            {
+                Logger.ErrorFormat("Could not resolve type: '{0}' in namespaces: {1}", typeName, string.Join(", ", namespacesArray));
+            }
+            else
+            {
+                Logger.DebugFormat("Successfully resolved: {0}", result.ToString());
+            }
+            
+            return result;
         }
 
         private void RemoveObsoleteFactoriesFromSolution(string[] obsoleteFactoryFilePaths,
@@ -876,6 +1045,12 @@
 
             var (project, typeDeclarationDocument) = this.solution.Projects.Select(proj => (proj, doc: proj.GetDocument(concreteClassDeclarationSyntax.SyntaxTree))).First(t => t.doc != null);
             var factoryGeneratorEngine = new FactoryGeneratorEngine(project, this.templatePath);
+            
+            // Get the semantic model to ensure we have the most accurate symbol information including constraints
+            var semanticModel = typeDeclarationDocument.GetSemanticModelAsync().Result;
+            var concreteClassSymbolFromSemantics = semanticModel.GetDeclaredSymbol(concreteClassDeclarationSyntax) as INamedTypeSymbol;
+            // Use the symbol from semantics if available, as it has better constraint information from source
+            var concreteTypeSymbolForConstraints = concreteClassSymbolFromSemantics ?? concreteClassTypeSymbol;
 
             var usingsToFilterOut = new[] { concreteClassTypeSymbol.ContainingNamespace.ToString() };
 
@@ -1077,7 +1252,15 @@
 
             // Generic types of the factory — merge concrete class constraints by position for open-generic forwarding.
             // Materialize to array so both GenericTypes and GenericTypeConstraints can iterate it independently.
-            var classGenericTypes = this.genericTypeBuilderService.Build(factoryInterfaceTypeSymbol.TypeParameters, genericArgumentTypeSymbols, concreteClassTypeSymbol.TypeParameters).ToArray();
+            // Use the semantic model-based symbol to ensure constraint information is available from source
+            var concreteTypeParams = concreteTypeSymbolForConstraints?.TypeParameters ?? default;
+            if (concreteTypeParams.IsDefaultOrEmpty && concreteClassDeclarationSyntax.TypeParameterList != null)
+            {
+                // This shouldn't happen, but log it if it does
+                Logger.Warn($"Type parameters not available for {concreteClassDeclarationSyntax.Identifier.ValueText}, constraints may be missing");
+                concreteTypeParams = default;
+            }
+            var classGenericTypes = this.genericTypeBuilderService.Build(factoryInterfaceTypeSymbol.TypeParameters, genericArgumentTypeSymbols, concreteTypeParams).ToArray();
 
             // Constructor of the factory
             var constructor = this.constructorBuilderService.Build(concreteClassDeclarationSyntax, injectedParameters, knownNamespaces);
@@ -1108,7 +1291,14 @@
                                                  outerUsingDeclarations.ToFullString());
 
             object model = factoryFile;
-            var transformationScript = $@"{Path.GetDirectoryName(this.templatePath)}\{inheritFqn}.tcs";
+            // Build template name without generic type parameters to avoid illegal characters in path
+            var containingNamespace = factoryInterfaceTypeSymbol.ContainingNamespace?.ToString();
+            var simpleTypeName = factoryInterfaceTypeSymbol.Name;
+            var templateName = string.IsNullOrEmpty(containingNamespace) 
+                ? simpleTypeName 
+                : $"{containingNamespace}.{simpleTypeName}";
+            
+            var transformationScript = Path.Combine(this.templateDirectory, $"{templateName}.tcs");
 
             // Execute the script associated to the template in order to adapt the model for the template whether it exists.
             if (File.Exists(transformationScript))
@@ -1129,7 +1319,8 @@
             }
 
             // The result of the generator
-            var factoryResult = factoryGeneratorEngine.Generate(model, inheritFqn);
+            // Pass the unbound generic type name for template resolution (matches .render file naming)
+            var factoryResult = factoryGeneratorEngine.Generate(model, templateName);
 
             if (!isSdkStyleProject)
             {

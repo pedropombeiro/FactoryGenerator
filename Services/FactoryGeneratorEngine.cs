@@ -5,6 +5,8 @@
     using System.IO;
     using System.Linq;
 
+    using Common.Logging;
+
     using DeveloperInTheFlow.FactoryGenerator.Models;
 
     using Microsoft.CodeAnalysis;
@@ -16,6 +18,12 @@
     /// </summary>
     public class FactoryGeneratorEngine
     {
+        #region Static Fields
+
+        private static readonly ILog Logger = LogManager.GetLogger<FactoryGeneratorEngine>();
+
+        #endregion
+
         #region Fields
 
         private readonly Project project;
@@ -66,7 +74,9 @@
 
         private string ResolveTemplatePath(string factoryFor)
         {
-            var customTemplatePath = $@"{Path.GetDirectoryName(this.templatePath)}\{factoryFor}.render";
+            var templateDirectory = Path.GetDirectoryName(this.templatePath);
+            var customTemplatePath = Path.Combine(templateDirectory, $"{factoryFor}.render");
+            
             if (File.Exists(customTemplatePath))
             {
                 return customTemplatePath;
