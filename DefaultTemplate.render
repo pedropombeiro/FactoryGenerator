@@ -6,6 +6,7 @@
 
 namespace {{Namespace}}
 {
+	using System;
 {{InnerUsings}}
     /// <summary>
     ///		The implementation for the factory generating <see cref="{{Class.ConcreteClassName}}" /> instances.

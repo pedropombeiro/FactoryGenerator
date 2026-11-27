@@ -64,6 +64,7 @@
                                                string factoryFor)
         {
             var template = this.ResolveTemplatePath(factoryFor);
+            Logger.Debug($"Render template used: {template}");
             var code = Render.FileToString(template, model);
             return new FactorGeneratoryResult(code);
         }
