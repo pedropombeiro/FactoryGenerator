@@ -38,16 +38,19 @@
         /// <param name="injectedParameters">
         ///     The injected parameters in the factory.
         /// </param>
+        /// <param name="knownNamespaces">
+        ///     The collection of namespaces with using directives in the generated file.
+        /// </param>
         /// <returns>
         ///     Models representing fields in the factory.
         /// </returns>
-        public IEnumerable<Field> Build(IEnumerable<IParameterSymbol> injectedParameters)
+        public IEnumerable<Field> Build(IEnumerable<IParameterSymbol> injectedParameters, System.Collections.Generic.ICollection<string> knownNamespaces = null)
         {
             var parameterSymbols = injectedParameters as IParameterSymbol[] ?? injectedParameters.ToArray();
             return !parameterSymbols.Any()
                        ? Enumerable.Empty<Field>()
                        : parameterSymbols.Select(x => new Field(x.Name,
-                                                                this.parameterSymbolBuilderService.BuildArgumentType(x, true),
+                                                                this.parameterSymbolBuilderService.BuildArgumentType(x, true, knownNamespaces),
                                                                 this.parameterSymbolBuilderService.DeterminesIfValueType(x.Type)));
         }
 

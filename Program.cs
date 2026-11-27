@@ -2,9 +2,11 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.IO;
     using System.Linq;
     using System.Reflection;
     using System.Threading.Tasks;
+    using System.Xml;
 
     using CommandLine;
 
@@ -45,6 +47,89 @@
         #endregion
 
         #region Methods
+
+        private static void PatchBuildHostBindingRedirects(string msbuildBinPath)
+        {
+            var assembliesToPatch = new[]
+            {
+                "Microsoft.Bcl.AsyncInterfaces",
+                "System.Buffers",
+                "System.Collections.Immutable",
+                "System.Memory",
+                "System.Numerics.Vectors",
+                "System.Runtime.CompilerServices.Unsafe",
+                "System.Threading.Tasks.Extensions",
+            };
+
+            var buildHostDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "BuildHost-net472");
+            var configPath = Path.Combine(buildHostDir, "Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.exe.config");
+
+            if (!Directory.Exists(buildHostDir) || !File.Exists(configPath))
+            {
+                Logger.Warn($"BuildHost-net472 not found at {buildHostDir}, skipping binding redirect patch.");
+                return;
+            }
+
+            // MSBuild ships DLLs in its bin dir (e.g. .../MSBuild/Current/Bin), but
+            // MSBuildLocator gives us the path which may point to the amd64 subdirectory.
+            // Check both the given path and its parent to handle both cases.
+            var searchDirs = new[] { msbuildBinPath, Path.GetDirectoryName(msbuildBinPath) }
+                             .Where(d => d != null && Directory.Exists(d))
+                             .Distinct()
+                             .ToArray();
+
+            var config = new XmlDocument();
+            config.Load(configPath);
+
+            var ns = new XmlNamespaceManager(config.NameTable);
+            ns.AddNamespace("b", "urn:schemas-microsoft-com:asm.v1");
+
+            var patched = false;
+
+            foreach (var assemblyName in assembliesToPatch)
+            {
+                var sourceDll = searchDirs
+                    .SelectMany(dir => Directory.EnumerateFiles(dir, $"{assemblyName}.dll", SearchOption.AllDirectories))
+                    .FirstOrDefault();
+
+                if (sourceDll == null)
+                {
+                    Logger.Debug($"Skipping {assemblyName}: not found in MSBuild bin.");
+                    continue;
+                }
+
+                var newVersion = AssemblyName.GetAssemblyName(sourceDll).Version;
+                var newVersionStr = newVersion.ToString(4);
+
+                File.Copy(sourceDll, Path.Combine(buildHostDir, $"{assemblyName}.dll"), overwrite: true);
+
+                var identityNodes = config.SelectNodes($"//b:assemblyIdentity[@name='{assemblyName}']", ns);
+                if (identityNodes == null)
+                    continue;
+
+                foreach (XmlNode identityNode in identityNodes)
+                {
+                    var bindingRedirect = identityNode.ParentNode?.SelectSingleNode("b:bindingRedirect", ns) as XmlElement;
+                    if (bindingRedirect == null)
+                        continue;
+
+                    var existing = bindingRedirect.GetAttribute("newVersion");
+                    if (existing == newVersionStr)
+                        continue;
+
+                    bindingRedirect.SetAttribute("oldVersion", $"0.0.0.0-{newVersionStr}");
+                    bindingRedirect.SetAttribute("newVersion", newVersionStr);
+                    patched = true;
+                    Logger.Debug($"Patched binding redirect for {assemblyName}: {existing} → {newVersionStr}");
+                }
+            }
+
+            if (patched)
+            {
+                config.Save(configPath);
+                Logger.Info("BuildHost-net472 binding redirects patched for current VS MSBuild version.");
+            }
+        }
 
         private static async Task GenerateFactoriesAsync(string solutionPath,
                                                          IEnumerable<string> attributeImportList,
@@ -103,8 +188,9 @@
 
                 MSBuildLocator.RegisterInstance(usedInstance);
 
-                GenerateFactoriesAsync(
-                                       CommandLineOptions.SolutionPath,
+                PatchBuildHostBindingRedirects(usedInstance.MSBuildPath);
+
+                GenerateFactoriesAsync(CommandLineOptions.SolutionPath,
                                        CommandLineOptions.AttributeImportList.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries),
                                        CommandLineOptions.WriteXmlDoc,
                                        CommandLineOptions.TemplatePath,

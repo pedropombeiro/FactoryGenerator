@@ -46,11 +46,15 @@ namespace DeveloperInTheFlow.FactoryGenerator.Services
         /// <param name="injectedParameters">
         ///   The injected parameters in the factory.
         /// </param>
+        /// <param name="knownNamespaces">
+        ///   The collection of namespaces with using directives in the generated file.
+        /// </param>
         /// <returns>
         ///     The model representing the constructor of the factory.
         /// </returns>
         public Constructor Build(ClassDeclarationSyntax concreteClassDeclarationSyntax,
-                                 IEnumerable<IParameterSymbol> injectedParameters)
+                                 IEnumerable<IParameterSymbol> injectedParameters,
+                                 System.Collections.Generic.ICollection<string> knownNamespaces = null)
         {
             var parameterSymbols = injectedParameters as IParameterSymbol[] ?? injectedParameters.ToArray();
             if (!parameterSymbols.Any())
@@ -69,7 +73,7 @@ namespace DeveloperInTheFlow.FactoryGenerator.Services
                                                                                }).ToArray();
 
             var constructorAttributes = new List<Attribute>(importedConstructorAttributes.Select(x => Attribute.Create(x.ToString())));
-            var constructorArguments = this.argumentsBuilderService.BuildConstructorArgument(parameterSymbols);
+            var constructorArguments = this.argumentsBuilderService.BuildConstructorArgument(parameterSymbols, knownNamespaces);
 
             return new Constructor(constructorArguments, constructorAttributes);
         }

@@ -41,9 +41,10 @@
         /// <returns>
         ///     The argument models.
         /// </returns>
-        public IEnumerable<Argument> BuildConstructorArgument(IEnumerable<IParameterSymbol> parameterSymbols)
+        public IEnumerable<Argument> BuildConstructorArgument(IEnumerable<IParameterSymbol> parameterSymbols,
+                                                               System.Collections.Generic.ICollection<string> knownNamespaces = null)
         {
-            var arguments = parameterSymbols.Select(x => this.BuildArgument(x, true));
+            var arguments = parameterSymbols.Select(x => this.BuildArgument(x, true, knownNamespaces));
 
             return this.SetLastArgument(arguments);
         }
@@ -57,9 +58,10 @@
         /// <returns>
         ///     The argument models.
         /// </returns>
-        public IEnumerable<Argument> BuildMethodArgument(IEnumerable<IParameterSymbol> parameterSymbols)
+        public IEnumerable<Argument> BuildMethodArgument(IEnumerable<IParameterSymbol> parameterSymbols,
+                                                          System.Collections.Generic.ICollection<string> knownNamespaces = null)
         {
-            var arguments = parameterSymbols.Select(x => this.BuildArgument(x, false));
+            var arguments = parameterSymbols.Select(x => this.BuildArgument(x, true, knownNamespaces));
 
             return this.SetLastArgument(arguments);
         }
@@ -90,9 +92,10 @@
         #region Methods
 
         private Argument BuildArgument(IParameterSymbol parameterSymbol,
-                                       bool isShort)
+                                       bool isShort,
+                                       System.Collections.Generic.ICollection<string> knownNamespaces = null)
         {
-            return new Argument(this.parameterSymbolBuilderService.BuildArgumentType(parameterSymbol, isShort),
+            return new Argument(this.parameterSymbolBuilderService.BuildArgumentType(parameterSymbol, isShort, knownNamespaces),
                                 parameterSymbol.Name,
                                 this.parameterSymbolBuilderService.BuildAttributes(parameterSymbol),
                                 this.parameterSymbolBuilderService.DeterminesIfValueType(parameterSymbol.Type));

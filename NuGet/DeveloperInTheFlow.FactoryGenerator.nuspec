@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
 	<metadata>
 		<id>DeveloperInTheFlow.FactoryGenerator</id>
-		<version>3.9.4</version>
+		<version>4.0.14</version>
 		<title>Factory Generator (Roslyn)</title>
 		<authors>Pedro Pombeiro,Daniel Romero,Benjamin Burgy</authors>
 		<owners>Pedro Pombeiro</owners>
@@ -13,7 +13,7 @@
 
 			Can be used in a build server environment.
 		</description>
-		<releaseNotes>Support latest msbuild and use newer version of newtonsoft.json</releaseNotes>
+		<releaseNotes>Fixed nested generic type resolution (e.g., EcuGroupFunctionStep&lt;MaintenanceModeCrsStep&gt;) by properly matching closing brackets. Improved diagnostics for type resolution failures.</releaseNotes>
 		<copyright>Copyright © Pedro Pombeiro 2015</copyright>
 		<tags>factories Roslyn C#</tags>
 	</metadata>

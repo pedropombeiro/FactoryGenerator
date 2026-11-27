@@ -1,6 +1,6 @@
 ﻿namespace DeveloperInTheFlow.FactoryGenerator.Services
 {
-    using System;
+    using System.Collections.Immutable;
     using System.Collections.Generic;
     using System.Linq;
 
@@ -25,14 +25,39 @@
 	    /// <returns>
 	    ///     An <see cref="Enumerable"/> of arguments representing generic type.
 	    /// </returns>
-	    public IEnumerable<GenericType> Build(
-		    IEnumerable<ITypeParameterSymbol> typeParameterSymbols,
-		    INamedTypeSymbol[] genericArgumentTypeSymbols = null)
-        {
-            return typeParameterSymbols.Select((x, i) => (i, new GenericType(x.Name, this.GetWhereStatement(x))))
-                                       .Where(t => genericArgumentTypeSymbols?[t.Item1] == null)
-                                       .Select(t => t.Item2);
-        }
+		public IEnumerable<GenericType> Build(
+			IEnumerable<ITypeParameterSymbol> typeParameterSymbols,
+			INamedTypeSymbol[] genericArgumentTypeSymbols = null,
+			ImmutableArray<ITypeParameterSymbol> concreteClassTypeParameters = default)
+		{
+			return typeParameterSymbols.Select((x, i) =>
+											{
+												// Use the concrete class's type parameter constraints at the same
+												// position when the factory interface's type parameter has none,
+												// but always emit the constraint using the factory interface's
+												// type parameter name (x.Name) so the generated code is valid.
+												var concreteParam = !concreteClassTypeParameters.IsDefaultOrEmpty && i < concreteClassTypeParameters.Length
+													? concreteClassTypeParameters[i]
+													: null;
+												string whereStatement;
+												if (concreteParam != null
+													&& this.GetWhereStatement(x) == null
+													&& this.GetWhereStatement(concreteParam) != null)
+												{
+													whereStatement = this.GetWhereStatement(concreteParam, x.Name);
+												}
+												else
+												{
+													whereStatement = this.GetWhereStatement(x, additionalConstraintsSource: concreteParam);
+												}
+
+											return (i, new GenericType(x.Name, whereStatement));
+										})
+									   .Where(t => genericArgumentTypeSymbols == null
+												   || t.Item1 >= genericArgumentTypeSymbols.Length
+												   || genericArgumentTypeSymbols[t.Item1] == null)
+									   .Select(t => t.Item2);
+		}
 
         /// <summary>
         ///     Builds a string representing generic types.
@@ -53,23 +78,37 @@
 
         #endregion
 
-        private string GetWhereStatement(ITypeParameterSymbol typeParameterSymbol)
+        private string GetWhereStatement(ITypeParameterSymbol typeParameterSymbol, string nameOverride = null, ITypeParameterSymbol additionalConstraintsSource = null)
         {
-            string result = "where " + typeParameterSymbol.Name + " : ";
+            string result = "where " + (nameOverride ?? typeParameterSymbol.Name) + " : ";
 
              List<string> constraints = new List<string>();
 
-            if (typeParameterSymbol.HasReferenceTypeConstraint)
+            if (typeParameterSymbol.HasReferenceTypeConstraint || (additionalConstraintsSource?.HasReferenceTypeConstraint ?? false))
             {
                 constraints.Add("class");
             }
 
-            if (typeParameterSymbol.HasValueTypeConstraint)
+            if (typeParameterSymbol.HasValueTypeConstraint || (additionalConstraintsSource?.HasValueTypeConstraint ?? false))
             {
                 constraints.Add("struct");
             }
 
             constraints.AddRange(typeParameterSymbol.ConstraintTypes.Cast<INamedTypeSymbol>().Select(ct => ct.Name + this.BuildString(ct.TypeParameters)));
+
+            // Also merge interface constraints from the concrete class's type parameter that are
+            // not already present (e.g. IEcuGroupFunctionStep when the factory interface only
+            // declares IComparable for the same type parameter).
+            if (additionalConstraintsSource != null)
+            {
+                var existingNames = new System.Collections.Generic.HashSet<string>(constraints);
+                foreach (var ct in additionalConstraintsSource.ConstraintTypes.Cast<INamedTypeSymbol>())
+                {
+                    var entry = ct.Name + this.BuildString(ct.TypeParameters);
+                    if (existingNames.Add(entry))
+                        constraints.Add(entry);
+                }
+            }
 
             if (constraints.Count == 0)
                 return null;

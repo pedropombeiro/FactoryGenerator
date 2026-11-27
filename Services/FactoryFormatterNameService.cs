@@ -22,7 +22,7 @@
         /// </returns>
         public string GetName(ClassDeclarationSyntax concreteTypeDeclarationSyntax)
         {
-            return "{0}Factory".FormatWith(concreteTypeDeclarationSyntax.Identifier.ValueText);
+            return string.Format("{0}Factory", concreteTypeDeclarationSyntax.Identifier.ValueText);
         }
 
         #endregion

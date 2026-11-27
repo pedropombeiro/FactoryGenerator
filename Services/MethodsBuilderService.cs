@@ -68,20 +68,41 @@
 	    /// <returns>
 	    ///     Models representing the factory methods.
 	    /// </returns>
-	    public IEnumerable<Method> Build(
-		    INamedTypeSymbol concreteClassSymbol,
-		    IEnumerable<Field> fields,
-		    IParameterSymbol[] injectedParameters,
-		    (ITypeSymbol returnType, IMethodSymbol symbol)[] factoryMethods,
-		    string factoryInterfaceName)
-        {
-            if (!factoryMethods.Any())
-            {
-                return Enumerable.Empty<Method>();
-            }
+		public IEnumerable<Method> Build(
+			INamedTypeSymbol concreteClassSymbol,
+			IEnumerable<Field> fields,
+			IParameterSymbol[] injectedParameters,
+			(ITypeSymbol returnType, IMethodSymbol symbol)[] factoryMethods,
+			string factoryInterfaceName,
+			INamedTypeSymbol factoryInterfaceTypeSymbol = null,
+			ICollection<string> knownNamespaces = null)
+		{
+			if (!factoryMethods.Any())
+			{
+				return Enumerable.Empty<Method>();
+			}
 
-            fields = fields as Field[] ?? fields.ToArray();
-            var methods = new List<Method>();
+			fields = fields as Field[] ?? fields.ToArray();
+			var methods = new List<Method>();
+
+			// For open-generic forwarding factories (e.g. typeof(IFoo<,,>)), the factory class uses
+			// the factory interface's type parameter names (e.g. TFunctionState), while the concrete
+			// class may use different names for the same positional type parameters (e.g. TFunctionStates).
+			// Build the constructor instantiation type using the interface's type parameter names so the
+			// generated code compiles correctly inside the factory class.
+			string newInstanceType;
+			if (factoryInterfaceTypeSymbol != null && factoryInterfaceTypeSymbol.TypeParameters.Length > 0
+				&& concreteClassSymbol.TypeParameters.Length == factoryInterfaceTypeSymbol.TypeParameters.Length)
+			{
+				var interfaceTypeParamNames = string.Join(", ", factoryInterfaceTypeSymbol.TypeParameters.Select(tp => tp.Name));
+				newInstanceType = $"{concreteClassSymbol.ContainingNamespace}.{concreteClassSymbol.Name}<{interfaceTypeParamNames}>";
+			}
+			else
+			{
+				newInstanceType = concreteClassSymbol.ToString();
+			}
+
+			newInstanceType = FactoryGenerator.ShortenTypeName(newInstanceType, knownNamespaces);
 
 // ReSharper disable once LoopCanBeConvertedToQuery
             foreach (var factoryMethod in factoryMethods)
@@ -89,7 +110,7 @@
                 var constructor = GetConstructorFromFactoryMethod(factoryMethod.symbol, concreteClassSymbol);
                 var factoryMethodParameters = factoryMethod.symbol.Parameters;
 
-                var arguments = this.argumentsBuilderService.BuildMethodArgument(factoryMethodParameters)
+                var arguments = this.argumentsBuilderService.BuildMethodArgument(factoryMethodParameters, knownNamespaces)
                                     .ToArray();
                 var constructorArguments = this.BuildConstructorParameters(constructor, arguments, fields, injectedParameters, factoryInterfaceName);
                 var genericArguments = this.genericTypeBuilderService.Build(factoryMethod.symbol.TypeParameters);
@@ -97,11 +118,11 @@
                 if (this.writeXmlDoc)
                 {
                     var xmlComments = BuildXmlDoc(factoryMethod.symbol);
-                    methods.Add(new Method("Create", factoryMethod.returnType.ToString(), concreteClassSymbol.ToString(), arguments, constructorArguments, genericArguments, xmlComments));
+                    methods.Add(new Method("Create", FactoryGenerator.ShortenTypeName(factoryMethod.returnType.ToString(), knownNamespaces), newInstanceType, arguments, constructorArguments, genericArguments, xmlComments));
                 }
                 else
                 {
-                    methods.Add(new Method("Create", factoryMethod.returnType.ToString(), concreteClassSymbol.ToString(), arguments, constructorArguments, genericArguments, string.Empty));
+                    methods.Add(new Method("Create", FactoryGenerator.ShortenTypeName(factoryMethod.returnType.ToString(), knownNamespaces), newInstanceType, arguments, constructorArguments, genericArguments, string.Empty));
                 }
             }
 
@@ -120,7 +141,7 @@
                                                        .TakeWhile(line => line != "</member>")
                                                        .ToArray();
             var indent = relevantLines.First().Length - relevantLines.First().TrimStart().Length;
-            var relevantLinesAsXmlDoc = relevantLines.Select(line => "        /// {0}".FormatWith(line.Substring(indent)));
+            var relevantLinesAsXmlDoc = relevantLines.Select(line => string.Format("        /// {0}", line.Substring(indent)));
 
             return string.Join("\r\n", relevantLinesAsXmlDoc);
         }
@@ -157,7 +178,7 @@
             }
             catch (InvalidOperationException e)
             {
-                throw new InvalidOperationException("Could not select a constructor from {0} type with the following parameters: ({1}).".FormatWith(concreteClassSymbol.Name, string.Join(", ", factoryMethodParameters.Select(x => x.Name))), e);
+                throw new InvalidOperationException(string.Format("Could not select a constructor from {0} type with the following parameters: ({1}).", concreteClassSymbol.Name, string.Join(", ", factoryMethodParameters.Select(x => x.Name))), e);
             }
         }
 

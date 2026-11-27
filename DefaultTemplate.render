@@ -6,6 +6,7 @@
 
 namespace {{Namespace}}
 {
+	using System;
 {{InnerUsings}}
     /// <summary>
     ///		The implementation for the factory generating <see cref="{{Class.ConcreteClassName}}" /> instances.
@@ -14,6 +15,9 @@ namespace {{Namespace}}
 	[{{Name}}{{#if Arguments}}({{#each Arguments}}{{&Text}}{{^IsLast}}, {{/IsLast}}{{/each}}){{/if}}]
 {{/each}}
     public partial class {{Class.Name}}{{#Class.GenericTypes}}<{{&Class.GenericTypes}}>{{/Class.GenericTypes}} : {{&Class.Inherit}}
+{{#Class.WhereClause}}
+        {{&Class.WhereClause}}
+{{/Class.WhereClause}}
     {
 		{{#if Class.Fields}}
 		#region Fields
