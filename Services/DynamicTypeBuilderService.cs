@@ -4,7 +4,6 @@
     using System.Collections.Generic;
     using System.Reflection;
     using System.Reflection.Emit;
-    using System.Threading;
 
     public class DynamicTypeBuilderService
     {
@@ -26,9 +25,8 @@
                 {
                     var assemblyName = new AssemblyName();
                     assemblyName.Name = "AttributeTypesAssembly";
-                    var thisDomain = Thread.GetDomain();
-                    var asmBuilder = thisDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
-                    modBuilder = asmBuilder.DefineDynamicModule(asmBuilder.GetName().Name, false);
+                    var asmBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
+                    modBuilder = asmBuilder.DefineDynamicModule(asmBuilder.GetName().Name);
                 }
 
                 return modBuilder;

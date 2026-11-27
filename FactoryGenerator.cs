@@ -13,8 +13,6 @@
     using System.Threading;
     using System.Threading.Tasks;
 
-    using Common.Logging;
-
     using CSScriptLib;
 
     using DeveloperInTheFlow.FactoryGenerator.Models;
@@ -28,6 +26,7 @@
 
     using Newtonsoft.Json;
     using Newtonsoft.Json.Linq;
+    using NLog;
 
     using Attribute = DeveloperInTheFlow.FactoryGenerator.Models.Attribute;
     using Project = Microsoft.CodeAnalysis.Project;
@@ -36,7 +35,7 @@
     {
         #region Static Fields
 
-        private static readonly ILog Logger = LogManager.GetLogger<FactoryGenerator>();
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         #endregion
 

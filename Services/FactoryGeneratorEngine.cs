@@ -5,11 +5,12 @@
     using System.IO;
     using System.Linq;
 
-    using Common.Logging;
-
+    using DeveloperInTheFlow.FactoryGenerator;
     using DeveloperInTheFlow.FactoryGenerator.Models;
 
     using Microsoft.CodeAnalysis;
+
+    using NLog;
 
     using Nustache.Core;
 
@@ -20,7 +21,7 @@
     {
         #region Static Fields
 
-        private static readonly ILog Logger = LogManager.GetLogger<FactoryGeneratorEngine>();
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         #endregion
 

@@ -16,20 +16,44 @@ public class Foo {
 
 The tool will generate the file **FooFactory.Generated.cs** as the same location than the class **Foo**.
 
-You can generate factories by executing **GenerateFactories.bat** with the solution as argument
+Install the .NET tool globally:
 
 ```
-GenerateFactories.bat -s <your solution path> [-t <templatePath>] [-d] [-a <attribute1, attributeN>]
+dotnet tool install --global DeveloperInTheFlow.FactoryGenerator
 ```
 
-or through Visual Studio as an external tool, follow steps for using it in Visual Studio.
+Then run it from your solution directory:
+
+```
+factorygenerator -s <your solution path> [-t <templatePath>] [-d] [-a <attribute1, attributeN>]
+```
+
+Alternatively, install it as a local tool in a repository with a tool manifest:
+
+```
+dotnet new tool-manifest
+dotnet tool install DeveloperInTheFlow.FactoryGenerator
+dotnet tool run factorygenerator -- -s <your solution path>
+```
+
+The tool uses MSBuild from the installed .NET SDK. The .NET 8 runtime is required.
+
+To build the NuGet tool package from a Windows command prompt, run:
+
+```
+build-tool-package.bat
+```
+
+The package is written to `bin\Release`. Additional arguments are passed to `dotnet pack`, for example `build-tool-package.bat --output artifacts`.
+
+To use it through Visual Studio as an external tool:
 
 -	Open the external tool dialog by clicking on the menu **Tools -> External Tools ...**.
 -	Add a new external tool by clicking on the button **Add**.
 -	And then fill fields with these values:
 	-	Title: **Generate Factories**
-	-	Command: **$(SolutionDir)\GenerateFactories.bat**
-	-	Solution: **-s "$(SolutionDir)\$(SolutionFileName)"**
+	-	Command: **factorygenerator**
+	-	Arguments: **-s "$(SolutionDir)\$(SolutionFileName)"**
 	-	Template (optional): **-t <templatePath>** (by default the DefaultTemplate.render file is used for rendering the factory)
 	-	Comments: **-d** (Copy the documentation from the interface factory into the implementation)
 	-	Attributes import list: **-a** (Attributes that will be injected on the factory constructor)
